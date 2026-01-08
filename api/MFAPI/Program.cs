@@ -13,6 +13,14 @@ var builder = WebApplication.CreateBuilder(args);
 // Add environment variables to configuration
 builder.Configuration.AddEnvironmentVariables();
 
+// Add HTTP logging
+builder.Services.AddHttpLogging(logging =>
+{
+    logging.LoggingFields = Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.All;
+    logging.RequestBodyLogLimit = 4096;
+    logging.ResponseBodyLogLimit = 4096;
+});
+
 // Debug: Log Spotify configuration
 Console.WriteLine($"Spotify ClientId: {builder.Configuration["Spotify:ClientId"]}");
 Console.WriteLine($"Spotify ClientSecret: {builder.Configuration["Spotify:ClientSecret"]}");
@@ -67,6 +75,7 @@ using (var scope = app.Services.CreateScope())
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.UseHttpLogging();
 }
 
 app.UseHttpsRedirection();

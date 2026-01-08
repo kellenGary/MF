@@ -163,6 +163,50 @@ public class SpotifyController : ControllerBase
         }
     }
 
+    [HttpGet("songs/{songId}")]
+    public async Task<IActionResult> GetSongDetails(string songId)
+    {
+        try
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+            {
+                return Unauthorized(new { error = "Invalid token" });
+            }
+
+            var accessToken = await _spotifyTokenService.GetValidAccessTokenAsync(userId);
+
+            var client = _httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Authorization = 
+                new AuthenticationHeaderValue("Bearer", accessToken);
+
+            var response = await client.GetAsync($"https://api.spotify.com/v1/tracks/{songId}?fields=artists,name,duration_ms,album(name,images),external_urls,preview_url");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                _logger.LogError("Spotify API error: {Error}", error);
+                
+                return StatusCode((int)response.StatusCode, new 
+                { 
+                    error = "Failed to fetch song from Spotify",
+                    statusCode = (int)response.StatusCode,
+                    spotifyError = error
+                });
+            }
+
+            var content = await response.Content.ReadAsStringAsync();
+            var song = JsonSerializer.Deserialize<JsonElement>(content);
+
+            return Ok(song);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching song details");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+
     [HttpGet("recently-played")]
     public async Task<IActionResult> GetRecentlyPlayed()
     {
@@ -382,6 +426,73 @@ public class SpotifyController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching currently playing");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+
+    [HttpGet("player-state")]
+    public async Task<IActionResult> GetPlayerState()
+    {
+        try
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+            {
+                return Unauthorized(new { error = "Invalid token" });
+            }
+
+            var accessToken = await _spotifyTokenService.GetValidAccessTokenAsync(userId);
+
+            var client = _httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Authorization = 
+                new AuthenticationHeaderValue("Bearer", accessToken);
+
+            var response = await client.GetAsync("https://api.spotify.com/v1/me/player");
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                _logger.LogWarning("Spotify returned 401 for user {UserId}. Attempting forced refresh...", userId);
+                try 
+                {
+                    accessToken = await _spotifyTokenService.ForceRefreshTokenAsync(userId);
+                    client.DefaultRequestHeaders.Authorization = 
+                        new AuthenticationHeaderValue("Bearer", accessToken);
+                    response = await client.GetAsync("https://api.spotify.com/v1/me/player");
+                }
+                catch (Exception refreshEx)
+                {
+                    _logger.LogError(refreshEx, "Failed to force refresh Spotify token");
+                    return Unauthorized(new { error = "Spotify session expired" });
+                }
+            }
+
+            // Spotify may return 204 if there's no active device
+            if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
+            {
+                return Ok(new { isPlaying = false });
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                _logger.LogError("Spotify API error: {Error}", error);
+                
+                return StatusCode((int)response.StatusCode, new 
+                { 
+                    error = "Failed to fetch player state from Spotify",
+                    statusCode = (int)response.StatusCode,
+                    spotifyError = error
+                });
+            }
+
+            var content = await response.Content.ReadAsStringAsync();
+            var playerState = JsonSerializer.Deserialize<JsonElement>(content);
+
+            return Ok(playerState);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching player state");
             return StatusCode(500, new { error = "Internal server error" });
         }
     }

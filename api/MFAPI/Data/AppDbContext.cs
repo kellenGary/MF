@@ -15,9 +15,12 @@ public class AppDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
         
-        // Create unique index on SpotifyId
+        // Create unique index on SpotifyId and Handle
         modelBuilder.Entity<User>()
             .HasIndex(u => u.SpotifyId)
+            .IsUnique();
+        modelBuilder.Entity<User>()
+            .HasIndex(u => u.Handle)
             .IsUnique();
     }
 }

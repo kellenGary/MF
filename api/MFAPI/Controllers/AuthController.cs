@@ -9,7 +9,7 @@ using MFAPI.Services;
 namespace MFAPI.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("api/[controller]")]
 public class AuthController : ControllerBase
 {
     private readonly IHttpClientFactory _httpClientFactory;
@@ -123,28 +123,35 @@ public class AuthController : ControllerBase
             // Find or create user
             var user = await _context.Users
                 .FirstOrDefaultAsync(u => u.SpotifyId == spotifyId);
-            
+            var isNewUser = false;
             if (user == null)
             {
                 user = new User
                 {
                     SpotifyId = spotifyId,
                     DisplayName = displayName,
+                    Handle = displayName != null ? "@" + displayName.Replace(" ", string.Empty).ToLowerInvariant() : null,
+                    Bio = string.Empty,
                     Email = email,
                     ProfileImageUrl = profileImageUrl,
+                    HasCompletedProfile = false,
                     SpotifyAccessToken = accessToken,
                     SpotifyRefreshToken = refreshToken,
                     TokenExpiresAt = DateTime.UtcNow.AddSeconds(expiresIn),
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 };
-                
+                isNewUser = true;
                 _context.Users.Add(user);
                 _logger.LogInformation("[API] Created new user with Spotify ID: {SpotifyId}", spotifyId);
             }
             else
             {
                 user.DisplayName = displayName;
+                if (string.IsNullOrWhiteSpace(user.Handle) && displayName != null)
+                {
+                    user.Handle = "@" + displayName.Replace(" ", string.Empty).ToLowerInvariant();
+                }
                 user.Email = email;
                 user.ProfileImageUrl = profileImageUrl;
                 user.SpotifyAccessToken = accessToken;
@@ -163,13 +170,17 @@ public class AuthController : ControllerBase
             return Ok(new
             {
                 token = jwt,
+                isNewUser = isNewUser,
                 user = new
                 {
                     id = user.Id,
                     spotifyId = user.SpotifyId,
                     displayName = user.DisplayName,
+                    handle = user.Handle,
+                    bio = user.Bio,
                     email = user.Email,
-                    profileImageUrl = user.ProfileImageUrl
+                    profileImageUrl = user.ProfileImageUrl,
+                    hasCompletedProfile = user.HasCompletedProfile
                 }
             });
         }

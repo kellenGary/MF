@@ -12,9 +12,18 @@ public class User
     
     public string? DisplayName { get; set; }
     
+    // Username/handle (e.g., @example)
+    public string? Handle { get; set; }
+    
+    // User bio text
+    public string? Bio { get; set; }
+    
     public string? Email { get; set; }
     
     public string? ProfileImageUrl { get; set; }
+    
+    // Whether the user completed initial profile customization
+    public bool HasCompletedProfile { get; set; }
     
     [Required]
     public string SpotifyAccessToken { get; set; } = string.Empty;
