@@ -23,4 +23,7 @@ public class ListeningHistory
     public ListeningSource Source { get; set; }
 
     public string? DedupeKey { get; set; }
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    public double? LocationAccuracy { get; set; }
 }

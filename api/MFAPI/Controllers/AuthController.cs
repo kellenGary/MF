@@ -17,19 +17,22 @@ public class AuthController : ControllerBase
     private readonly IConfiguration _configuration;
     private readonly AppDbContext _context;
     private readonly IJwtService _jwtService;
+    private readonly IListeningHistoryService _listeningHistoryService;
 
     public AuthController(
         IHttpClientFactory httpClientFactory,
         ILogger<AuthController> logger,
         IConfiguration configuration,
         AppDbContext context,
-        IJwtService jwtService)
+        IJwtService jwtService,
+        IListeningHistoryService listeningHistoryService)
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
         _configuration = configuration;
         _context = context;
         _jwtService = jwtService;
+        _listeningHistoryService = listeningHistoryService;
     }
 
     [HttpGet("callback")]
@@ -60,7 +63,7 @@ public class AuthController : ControllerBase
             client.DefaultRequestHeaders.Authorization = 
                 new AuthenticationHeaderValue("Basic", authValue);
 
-            var formData = new Dictionary<string, string>
+            var formData = new Dictionary<string, string?>
             {
                 { "grant_type", "authorization_code" },
                 { "code", code },
@@ -163,6 +166,21 @@ public class AuthController : ControllerBase
             }
             
             await _context.SaveChangesAsync();
+            
+            // If new user, sync their initial listening history
+            if (isNewUser)
+            {
+                try
+                {
+                    _logger.LogInformation("[API] Starting initial listening history sync for new user {UserId}", user.Id);
+                    await _listeningHistoryService.SyncInitialListeningHistoryAsync(user.Id, accessToken);
+                }
+                catch (Exception syncEx)
+                {
+                    _logger.LogError(syncEx, "[API] Error syncing initial listening history for user {UserId}", user.Id);
+                    // Don't fail the login if sync fails, log it and continue
+                }
+            }
             
             // Generate JWT token
             var jwt = _jwtService.GenerateToken(user);

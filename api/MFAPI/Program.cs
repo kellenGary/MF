@@ -4,6 +4,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using MFAPI.Data;
 using MFAPI.Services;
+using System.IO;
 
 // Load .env file
 DotNetEnv.Env.Load();
@@ -13,12 +14,14 @@ var builder = WebApplication.CreateBuilder(args);
 // Add environment variables to configuration
 builder.Configuration.AddEnvironmentVariables();
 
-// Add HTTP logging
+// Add HTTP logging (minimal)
 builder.Services.AddHttpLogging(logging =>
 {
-    logging.LoggingFields = Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.All;
-    logging.RequestBodyLogLimit = 4096;
-    logging.ResponseBodyLogLimit = 4096;
+    logging.LoggingFields = Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.RequestPath | 
+                            Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.RequestMethod |
+                            Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.ResponseStatusCode;
+    logging.RequestBodyLogLimit = 0;
+    logging.ResponseBodyLogLimit = 0;
 });
 
 // Debug: Log Spotify configuration
@@ -33,11 +36,15 @@ builder.Services.AddHttpClient(); // Add HttpClient for Spotify API calls
 
 // Add SQLite Database
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection"))
+    .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
 
 // Add JWT Service
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<ISpotifyTokenService, SpotifyTokenService>();
+builder.Services.AddScoped<IListeningHistoryService, ListeningHistoryService>();
+builder.Services.AddScoped<IPlaylistSyncService, PlaylistSyncService>();
+builder.Services.AddScoped<ISavedTracksSyncService, SavedTracksSyncService>();
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
@@ -70,6 +77,27 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
+
+    // Apply SQL views from script
+    try
+    {
+        var contentRoot = app.Environment.ContentRootPath;
+        var scriptPath = Path.Combine(contentRoot, "scripts", "create_views.sql");
+        if (File.Exists(scriptPath))
+        {
+            var sql = File.ReadAllText(scriptPath);
+            db.Database.ExecuteSqlRaw(sql);
+            Console.WriteLine("Applied SQL views from scripts/create_views.sql");
+        }
+        else
+        {
+            Console.WriteLine($"SQL view script not found at: {scriptPath}");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Failed to apply SQL views: {ex.Message}");
+    }
 }
 
 if (app.Environment.IsDevelopment())

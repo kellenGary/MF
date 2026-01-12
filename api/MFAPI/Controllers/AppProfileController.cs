@@ -46,6 +46,27 @@ public class AppProfileController : ControllerBase
         });
     }
 
+    [HttpGet("{userId}")]
+    public async Task<IActionResult> GetAppProfileById(int userId)
+    {
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null)
+        {
+            return NotFound(new { error = "User not found" });
+        }
+
+        return Ok(new {
+            id = user.Id,
+            spotifyId = user.SpotifyId,
+            displayName = user.DisplayName,
+            handle = user.Handle,
+            bio = user.Bio,
+            email = user.Email,
+            profileImageUrl = user.ProfileImageUrl,
+            hasCompletedProfile = user.HasCompletedProfile
+        });
+    }
+
     public class UpdateAppProfileDto
     {
         public string? DisplayName { get; set; }
