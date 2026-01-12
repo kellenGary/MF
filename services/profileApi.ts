@@ -1,4 +1,4 @@
-import api, { User} from "./api";
+import api, { User } from "./api";
 
 class ProfileApiService {
   // Profile endpoints
@@ -7,8 +7,9 @@ class ProfileApiService {
     return await response.json();
   }
 
-  async getAppProfile(): Promise<User> {
-    const response = await api.makeAuthenticatedRequest('/api/profile/app');
+  async getAppProfile(userId?: number): Promise<User> {
+    const endpoint = userId ? `/api/profile/app/${userId}` : '/api/profile/app';
+    const response = await api.makeAuthenticatedRequest(endpoint);
     return await response.json();
   }
 

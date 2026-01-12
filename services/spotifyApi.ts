@@ -1,8 +1,40 @@
 import api from "./api";
 
+export interface PlaylistSyncResult {
+  success: boolean;
+  playlistsAdded: number;
+  playlistsUpdated: number;
+  playlistsRemoved: number;
+  syncedAt: string;
+}
+
+export interface SavedTracksSyncResult {
+  success: boolean;
+  tracksAdded: number;
+  tracksRemoved: number;
+  totalLikedTracks: number;
+  syncedAt: string;
+}
+
 class SpotifyApiService {
+  // Sync playlists from Spotify to database
+  async syncPlaylists(): Promise<PlaylistSyncResult> {
+    const response = await api.makeAuthenticatedRequest('/api/spotify/playlists/sync', {
+      method: 'POST',
+    });
+    return await response.json();
+  }
+
+  // Sync saved/liked tracks from Spotify to database
+  async syncSavedTracks(): Promise<SavedTracksSyncResult> {
+    const response = await api.makeAuthenticatedRequest('/api/spotify/saved-tracks/sync', {
+      method: 'POST',
+    });
+    return await response.json();
+  }
+
   // Spotify endpoints
-  async getPlaylists(): Promise<any> {
+  async getPlaylists(userId?: string): Promise<any> {
     const response = await api.makeAuthenticatedRequest('/api/spotify/playlists');
     return await response.json();
   }
@@ -16,7 +48,7 @@ class SpotifyApiService {
     return this.getPlaylist(playlistId);
   }
 
-  async getLikedSongs(): Promise<any> {
+  async getLikedSongs(userId?: string): Promise<any> {
     const response = await api.makeAuthenticatedRequest('/api/spotify/liked-songs');
     return await response.json();
   }
@@ -50,7 +82,7 @@ class SpotifyApiService {
   }
 
 
-  async getRecentlyPlayed(): Promise<any> {
+  async getRecentlyPlayed(userId?: string): Promise<any> {
     const response = await api.makeAuthenticatedRequest('/api/spotify/recently-played');
     return await response.json();
   }
