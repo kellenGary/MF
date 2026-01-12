@@ -58,6 +58,7 @@ export default function AlbumItem({ group }: { group: any }) {
 const styles = StyleSheet.create({
   albumGroup: {
     borderRadius: 12,
+    paddingHorizontal: 16,
   },
   albumHeader: {
     flexDirection: "row",

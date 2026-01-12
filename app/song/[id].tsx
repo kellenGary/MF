@@ -77,13 +77,11 @@ export default function SongModal() {
 
   useEffect(() => {
     if (!id) return;
-    console.log("Fetching song with ID:", JSON.stringify(id, null, 2));
     async function fetchSong() {
       setLoading(true);
       try {
         const fetchedSong = await spotifyApi.getSongDetails(id as string);
         setSong(fetchedSong);
-        console.log("Fetched song:", JSON.stringify(fetchedSong, null, 2));
       } catch (error) {
         console.error("Error fetching song:", error);
       } finally {
