@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Security.Claims;
 using MFAPI.Services;
 using MFAPI.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace MFAPI.Controllers;
 
@@ -31,6 +32,35 @@ public class ProfileController : ControllerBase
         _configuration = configuration;
         _spotifyTokenService = spotifyTokenService;
         _context = context;
+    }
+
+    [HttpGet("handle-exists")]
+    public async Task<IActionResult> HandleExists([FromQuery] string handle)
+    {
+        if (string.IsNullOrWhiteSpace(handle))
+        {
+            return BadRequest(new { error = "handle is required" });
+        }
+
+        try
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+            {
+                return Unauthorized(new { error = "Invalid token" });
+            }
+
+            var normalized = handle.Trim().ToLowerInvariant();
+            var exists = await _context.Users
+                .AnyAsync(u => u.Handle != null && u.Handle.ToLower() == normalized && u.Id != userId);
+
+            return Ok(new { exists });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error checking handle exists");
+            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+        }
     }
 
     [HttpGet]

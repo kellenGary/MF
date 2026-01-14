@@ -20,17 +20,15 @@ builder.Services.AddHttpLogging(logging =>
     logging.LoggingFields = Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.RequestPath | 
                             Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.RequestMethod |
                             Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.ResponseStatusCode;
-    logging.RequestBodyLogLimit = 0;
-    logging.ResponseBodyLogLimit = 0;
 });
 
-// Debug: Log Spotify configuration
-Console.WriteLine($"Spotify ClientId: {builder.Configuration["Spotify:ClientId"]}");
-Console.WriteLine($"Spotify ClientSecret: {builder.Configuration["Spotify:ClientSecret"]}");
-Console.WriteLine($"Spotify RedirectUri: {builder.Configuration["Spotify:RedirectUri"]}");
-
 // Add services to the container.
-builder.Services.AddControllers();
+// Configure JSON options to allow enum values to be passed as strings (e.g. "Public")
+builder.Services.AddControllers()
+    .AddJsonOptions(opts =>
+    {
+        opts.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    });
 builder.Services.AddOpenApi();
 builder.Services.AddHttpClient(); // Add HttpClient for Spotify API calls
 
@@ -45,6 +43,7 @@ builder.Services.AddScoped<ISpotifyTokenService, SpotifyTokenService>();
 builder.Services.AddScoped<IListeningHistoryService, ListeningHistoryService>();
 builder.Services.AddScoped<IPlaylistSyncService, PlaylistSyncService>();
 builder.Services.AddScoped<ISavedTracksSyncService, SavedTracksSyncService>();
+builder.Services.AddScoped<PostService>();
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");

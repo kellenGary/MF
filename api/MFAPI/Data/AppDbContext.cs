@@ -199,6 +199,11 @@ public class AppDbContext : DbContext
             .HasForeignKey(p => p.PlaylistId)
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Post>()
+            .HasOne(p => p.Artist)
+            .WithMany()
+            .HasForeignKey(p => p.ArtistId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Post>()
             .HasOne(p => p.SourceListeningHistory)
             .WithMany()
             .HasForeignKey(p => p.SourceListeningHistoryId)

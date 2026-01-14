@@ -46,3 +46,25 @@ public class PlaylistViewRow
     public string? PlaylistImageUrl { get; set; }
     public int TrackCount { get; set; }
 }
+
+/// <summary>
+/// DTO for rows from the TrackDetailsWithArtists SQL view
+/// </summary>
+public class TrackDetailsViewRow
+{
+    public int TrackId { get; set; }
+    public string? TrackSpotifyId { get; set; }
+    public string TrackName { get; set; } = string.Empty;
+    public int DurationMs { get; set; }
+    public bool Explicit { get; set; }
+    public int? Popularity { get; set; }
+    public int? AlbumId { get; set; }
+    public string? AlbumSpotifyId { get; set; }
+    public string? AlbumName { get; set; }
+    public string? AlbumImageUrl { get; set; }
+    public DateTime? AlbumReleaseDate { get; set; }
+    public int? ArtistId { get; set; }
+    public string? ArtistSpotifyId { get; set; }
+    public string? ArtistName { get; set; }
+    public int? ArtistOrder { get; set; }
+}

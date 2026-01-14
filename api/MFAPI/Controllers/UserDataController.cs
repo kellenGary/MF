@@ -315,4 +315,176 @@ public class UserDataController : ControllerBase
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
+
+    /// <summary>
+    /// Gets user's liked albums from the database (synced from Spotify)
+    /// </summary>
+    [HttpGet("liked-albums")]
+    public async Task<IActionResult> GetLikedAlbums(
+        [FromQuery] int limit = 50,
+        [FromQuery] int offset = 0)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null)
+        {
+            return Unauthorized(new { error = "Invalid token" });
+        }
+        return await GetLikedAlbumsForUser(userId.Value, limit, offset);
+    }
+
+    /// <summary>
+    /// Gets another user's liked albums from the database
+    /// </summary>
+    [HttpGet("liked-albums/{targetUserId}")]
+    public async Task<IActionResult> GetLikedAlbumsByUserId(
+        int targetUserId,
+        [FromQuery] int limit = 50,
+        [FromQuery] int offset = 0)
+    {
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId == null)
+        {
+            return Unauthorized(new { error = "Invalid token" });
+        }
+
+        var targetUser = await _context.Users.FindAsync(targetUserId);
+        if (targetUser == null)
+        {
+            return NotFound(new { error = "User not found" });
+        }
+
+        return await GetLikedAlbumsForUser(targetUserId, limit, offset);
+    }
+
+    private async Task<IActionResult> GetLikedAlbumsForUser(int userId, int limit, int offset)
+    {
+        try
+        {
+            if (limit < 1 || limit > 1000) limit = 50;
+            if (offset < 0) offset = 0;
+
+            var likedAlbums = await _context.UserLikedAlbums
+                .Where(ula => ula.UserId == userId)
+                .Include(ula => ula.Album)
+                .OrderByDescending(ula => ula.LikedAt)
+                .Skip(offset)
+                .Take(limit)
+                .Select(ula => new
+                {
+                    likedAt = ula.LikedAt,
+                    album = new
+                    {
+                        id = ula.Album.SpotifyId,
+                        name = ula.Album.Name,
+                        imageUrl = ula.Album.ImageUrl,
+                        releaseDate = ula.Album.ReleaseDate,
+                        albumType = ula.Album.AlbumType,
+                        totalTracks = ula.Album.TotalTracks
+                    }
+                })
+                .ToListAsync();
+
+            var total = await _context.UserLikedAlbums
+                .Where(ula => ula.UserId == userId)
+                .CountAsync();
+
+            return Ok(new
+            {
+                items = likedAlbums,
+                total,
+                limit,
+                offset
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching liked albums for user {UserId}", userId);
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+
+    /// <summary>
+    /// Gets user's followed artists from the database (synced from Spotify)
+    /// </summary>
+    [HttpGet("followed-artists")]
+    public async Task<IActionResult> GetFollowedArtists(
+        [FromQuery] int limit = 50,
+        [FromQuery] int offset = 0)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null)
+        {
+            return Unauthorized(new { error = "Invalid token" });
+        }
+        return await GetFollowedArtistsForUser(userId.Value, limit, offset);
+    }
+
+    /// <summary>
+    /// Gets another user's followed artists from the database
+    /// </summary>
+    [HttpGet("followed-artists/{targetUserId}")]
+    public async Task<IActionResult> GetFollowedArtistsByUserId(
+        int targetUserId,
+        [FromQuery] int limit = 50,
+        [FromQuery] int offset = 0)
+    {
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId == null)
+        {
+            return Unauthorized(new { error = "Invalid token" });
+        }
+
+        var targetUser = await _context.Users.FindAsync(targetUserId);
+        if (targetUser == null)
+        {
+            return NotFound(new { error = "User not found" });
+        }
+
+        return await GetFollowedArtistsForUser(targetUserId, limit, offset);
+    }
+
+    private async Task<IActionResult> GetFollowedArtistsForUser(int userId, int limit, int offset)
+    {
+        try
+        {
+            if (limit < 1 || limit > 1000) limit = 50;
+            if (offset < 0) offset = 0;
+
+            var followedArtists = await _context.UserFollowedArtists
+                .Where(ufa => ufa.UserId == userId)
+                .Include(ufa => ufa.Artist)
+                .OrderByDescending(ufa => ufa.FollowedAt)
+                .Skip(offset)
+                .Take(limit)
+                .Select(ufa => new
+                {
+                    followedAt = ufa.FollowedAt,
+                    artist = new
+                    {
+                        id = ufa.Artist.SpotifyId,
+                        name = ufa.Artist.Name,
+                        imageUrl = ufa.Artist.ImageUrl,
+                        popularity = ufa.Artist.Popularity
+                    }
+                })
+                .ToListAsync();
+
+            var total = await _context.UserFollowedArtists
+                .Where(ufa => ufa.UserId == userId)
+                .CountAsync();
+
+            return Ok(new
+            {
+                items = followedArtists,
+                total,
+                limit,
+                offset
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching followed artists for user {UserId}", userId);
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
 }
