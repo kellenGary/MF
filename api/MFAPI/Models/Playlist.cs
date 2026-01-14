@@ -20,6 +20,7 @@ public class Playlist
     public bool Collaborative { get; set; }
     public string? SnapshotId { get; set; }
     public string? ImageUrl { get; set; }
+    public int? TrackCount { get; set; }
 
     public ICollection<PlaylistTrack> Tracks { get; set; } = new List<PlaylistTrack>();
 }

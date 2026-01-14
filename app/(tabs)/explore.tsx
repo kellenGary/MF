@@ -1,12 +1,16 @@
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import dbApi from "@/services/dbApi";
-import { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import followApi from "@/services/followApi";
+import { RelativePathString, router } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function ExploreScreen() {
   const [users, setUsers] = useState<any[]>([]);
+  const [followStatus, setFollowStatus] = useState<Record<number, boolean>>({});
+  const [loadingFollows, setLoadingFollows] = useState<Record<number, boolean>>({});
   const [trendingSongs, setTrendingSongs] = useState<any[]>([]);
   const [trendingAlbums, setTrendingAlbums] = useState<any[]>([]);
   const [trendingPlaylists, setTrendingPlaylists] = useState<any[]>([]);
@@ -20,7 +24,15 @@ export default function ExploreScreen() {
     const fetchData = async () => {
       try {
         const usersData = await dbApi.getAllUsers();
-        setUsers(usersData?.slice(0, 5) || []);
+        const usersList = usersData?.slice(0, 5) || [];
+        setUsers(usersList);
+
+        // Fetch follow status for all users
+        if (usersList.length > 0) {
+          const userIds = usersList.map((u: any) => u.id);
+          const statuses = await followApi.getFollowStatusBatch(userIds);
+          setFollowStatus(statuses);
+        }
 
         // TODO: Add API endpoints for trending data
         // const songs = await dbApi.getTrendingSongs();
@@ -33,6 +45,23 @@ export default function ExploreScreen() {
     fetchData();
   }, []);
 
+  const handleToggleFollow = useCallback(async (userId: number) => {
+    // Prevent multiple simultaneous requests for the same user
+    if (loadingFollows[userId]) return;
+
+    setLoadingFollows(prev => ({ ...prev, [userId]: true }));
+
+    try {
+      const currentStatus = followStatus[userId] || false;
+      const newStatus = await followApi.toggleFollow(userId, currentStatus);
+      setFollowStatus(prev => ({ ...prev, [userId]: newStatus }));
+    } catch (error) {
+      console.error("Error toggling follow:", error);
+    } finally {
+      setLoadingFollows(prev => ({ ...prev, [userId]: false }));
+    }
+  }, [followStatus, loadingFollows]);
+
   const SectionHeader = ({ title }: { title: string }) => (
     <View style={styles.sectionHeader}>
       <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
@@ -42,27 +71,69 @@ export default function ExploreScreen() {
     </View>
   );
 
-  const UserCard = ({ user }: { user: any }) => (
-    <Pressable
-      style={[styles.userCard, { borderColor: colors.tabIconDefault }]}
-    >
-      <View
-        style={[styles.userAvatar, { backgroundColor: colors.tabIconDefault }]}
-      >
-        <Text style={styles.avatarText}>
-          {user.displayName?.[0]?.toUpperCase() || "?"}
-        </Text>
-      </View>
-      <Text style={[styles.userName, { color: colors.text }]} numberOfLines={1}>
-        {user.displayName}
-      </Text>
+  const handleOpenProfile = (userId: string) => {
+    router.push(`/profile/${userId}` as RelativePathString);
+  }
+
+  const UserCard = ({ user }: { user: any }) => {
+    const isFollowing = followStatus[user.id] || false;
+    const isLoading = loadingFollows[user.id] || false;
+
+    return (
       <Pressable
-        style={[styles.followButton, { backgroundColor: colors.tint }]}
+        style={[styles.userCard, { borderColor: colors.tabIconDefault }]}
+        onPress={() => handleOpenProfile(user.id)}
       >
-        <Text style={styles.followButtonText}>Follow</Text>
+        <View
+          style={[styles.userAvatar, { backgroundColor: colors.tabIconDefault }]}
+        >
+          {user?.profileImageUrl ? (
+            <Image
+              source={{ uri: user.profileImageUrl }}
+              style={styles.userAvatarImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <Text style={styles.avatarText}>
+              {user?.displayName?.[0]?.toUpperCase() || "?"}
+            </Text>
+          )}
+        </View>
+        <Text style={[styles.userName, { color: colors.text }]} numberOfLines={1}>
+          {user.displayName}
+        </Text>
+        <Pressable
+          style={[
+            styles.followButton,
+            {
+              backgroundColor: isFollowing ? "transparent" : colors.tint,
+              borderWidth: isFollowing ? 1 : 0,
+              borderColor: colors.tint,
+            },
+          ]}
+          onPress={(e) => {
+            e.stopPropagation();
+            handleToggleFollow(user.id);
+          }}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator size="small" color={!isFollowing ? Colors.light.text : "#fff"} />
+          ) : (
+            <Text
+              style={[
+                styles.followButtonText,
+                { color: !isFollowing ? Colors.light.text : "#fff" },
+              ]}
+              numberOfLines={1}
+            >
+              {isFollowing ? "Following" : "Follow"}
+            </Text>
+          )}
+        </Pressable>
       </Pressable>
-    </Pressable>
-  );
+    );
+  };
 
   const SongCard = ({ song }: { song: any }) => (
     <Pressable style={[styles.itemCard, { backgroundColor: colors.card }]}>
@@ -275,6 +346,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 8,
+  },
+  userAvatarImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 30,
   },
   avatarText: {
     fontSize: 24,

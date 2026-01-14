@@ -1,7 +1,6 @@
 import { Colors } from "@/constants/theme";
 import api from "@/services/api";
 import playbackApi from "@/services/playbackApi";
-import spotifyApi from "@/services/spotifyApi";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -77,13 +76,20 @@ export default function SongModal() {
 
   useEffect(() => {
     if (!id) return;
-    console.log("Fetching song with ID:", JSON.stringify(id, null, 2));
     async function fetchSong() {
       setLoading(true);
       try {
-        const fetchedSong = await spotifyApi.getSongDetails(id as string);
-        setSong(fetchedSong);
-        console.log("Fetched song:", JSON.stringify(fetchedSong, null, 2));
+        const response = await api.makeAuthenticatedRequest(`/api/tracks/${id}`);
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({ error: response.statusText }));
+          console.error("Failed to fetch song from DB", err);
+          setSong(null);
+          return;
+        }
+        const data = await response.json();
+        // endpoint returns { track }
+        setSong(data.track);
+        console.log("Fetched song:", JSON.stringify(data.track, null, 2));
       } catch (error) {
         console.error("Error fetching song:", error);
       } finally {
@@ -133,7 +139,7 @@ export default function SongModal() {
           ]}
         >
           <Image
-            source={{ uri: song.album.images[0]?.url || "" }}
+            source={{ uri: song?.album?.image_url || "" }}
             style={{
               width: 150,
               height: 150,
@@ -144,15 +150,15 @@ export default function SongModal() {
           <View style={{ flex: 1, gap: 12 }}>
             <View>
               <Text style={[styles.songName, { color: colors.text }]}>
-                {song.name}
+                {song?.name}
               </Text>
               <Text style={[styles.artistName, { color: colors.text }]}>
-                {song.artists.map((artist: any) => artist.name).join(", ")}
+                {song?.artists?.map((artist: any) => artist.name).join(", ")}
               </Text>
             </View>
             <Pressable
               style={styles.playButton}
-              onPress={() => playbackApi.playSong(id as string)}
+              onPress={() => playbackApi.playSong(song?.spotify_id || id as string)}
             >
               <Text style={{ color: "white" }}>Play</Text>
             </Pressable>

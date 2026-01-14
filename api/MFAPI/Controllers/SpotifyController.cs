@@ -18,17 +18,83 @@ public class SpotifyController : ControllerBase
     private readonly ILogger<SpotifyController> _logger;
     private readonly IConfiguration _configuration;
     private readonly ISpotifyTokenService _spotifyTokenService;
+    private readonly IPlaylistSyncService _playlistSyncService;
+    private readonly ISavedTracksSyncService _savedTracksSyncService;
 
     public SpotifyController(
         IHttpClientFactory httpClientFactory,
         ILogger<SpotifyController> logger,
         IConfiguration configuration,
-        ISpotifyTokenService spotifyTokenService)
+        ISpotifyTokenService spotifyTokenService,
+        IPlaylistSyncService playlistSyncService,
+        ISavedTracksSyncService savedTracksSyncService)
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
         _configuration = configuration;
         _spotifyTokenService = spotifyTokenService;
+        _playlistSyncService = playlistSyncService;
+        _savedTracksSyncService = savedTracksSyncService;
+    }
+
+    [HttpPost("playlists/sync")]
+    public async Task<IActionResult> SyncPlaylists()
+    {
+        try
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+            {
+                return Unauthorized(new { error = "Invalid token" });
+            }
+
+            var accessToken = await _spotifyTokenService.GetValidAccessTokenAsync(userId);
+            var result = await _playlistSyncService.SyncUserPlaylistsAsync(userId, accessToken);
+
+            return Ok(new 
+            { 
+                success = true,
+                playlistsAdded = result.PlaylistsAdded,
+                playlistsUpdated = result.PlaylistsUpdated,
+                playlistsRemoved = result.PlaylistsRemoved,
+                syncedAt = result.SyncedAt
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error syncing playlists");
+            return StatusCode(500, new { error = "Internal server error", message = ex.Message });
+        }
+    }
+
+    [HttpPost("saved-tracks/sync")]
+    public async Task<IActionResult> SyncSavedTracks()
+    {
+        try
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+            {
+                return Unauthorized(new { error = "Invalid token" });
+            }
+
+            var accessToken = await _spotifyTokenService.GetValidAccessTokenAsync(userId);
+            var result = await _savedTracksSyncService.SyncSavedTracksAsync(userId, accessToken);
+
+            return Ok(new 
+            { 
+                success = true,
+                tracksAdded = result.TracksAdded,
+                tracksRemoved = result.TracksRemoved,
+                totalLikedTracks = result.TotalLikedTracks,
+                syncedAt = result.SyncedAt
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error syncing saved tracks");
+            return StatusCode(500, new { error = "Internal server error", message = ex.Message });
+        }
     }
 
     [HttpGet("playlists")]

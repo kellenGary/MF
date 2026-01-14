@@ -4,9 +4,11 @@ import {
   ReactNode,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import api from "../services/api";
+import spotifyApi from "../services/spotifyApi";
 
 interface User {
   id: number;
@@ -35,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [jwtToken, setJwtToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const hasSyncedPlaylists = useRef(false);
 
   useEffect(() => {
     // Load token and user from secure storage on mount
@@ -46,11 +49,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // Sync Spotify playlists when user is authenticated
+  useEffect(() => {
+    if (jwtToken && user?.hasCompletedProfile && !hasSyncedPlaylists.current) {
+      hasSyncedPlaylists.current = true;
+      syncSpotifyData();
+    }
+  }, [jwtToken, user?.hasCompletedProfile]);
+
+  async function syncSpotifyData() {
+    try {
+      console.log("[AuthContext] Syncing Spotify data...");
+      
+      // Sync playlists
+      const playlistResult = await spotifyApi.syncPlaylists();
+      console.log("[AuthContext] Playlist sync complete:", playlistResult);
+      
+      // Sync saved/liked tracks
+      const savedTracksResult = await spotifyApi.syncSavedTracks();
+      console.log("[AuthContext] Saved tracks sync complete:", savedTracksResult);
+    } catch (error) {
+      // Don't fail the app if sync fails, just log it
+      console.error("[AuthContext] Failed to sync Spotify data:", error);
+    }
+  }
+
   async function loadAuthData() {
     try {
       const token = await SecureStore.getItemAsync("jwt_token");
       const userStr = await SecureStore.getItemAsync("user");
-
       setJwtToken(token);
       // Sync token to API service
       api.setAuthToken(token);

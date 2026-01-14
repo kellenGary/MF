@@ -14,6 +14,7 @@ public class Album
     public string? AlbumType { get; set; }
     public string? ImageUrl { get; set; }
     public string? Label { get; set; }
+    public int? TotalTracks { get; set; }
 
     public ICollection<Track> Tracks { get; set; } = new List<Track>();
 }

@@ -10,6 +10,7 @@ import "react-native-reanimated";
 
 import { Colors } from "@/constants/theme";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { ListeningHistoryProvider } from "@/contexts/ListeningHistoryContext";
 import { PlaybackProvider } from "@/contexts/playbackContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
@@ -69,6 +70,13 @@ function RootLayoutNav() {
           sheetGrabberVisible: true,
         }}
       />
+      <Stack.Screen
+        name="post-preview"
+        options={{
+          presentation: "modal",
+          animation: "slide_from_right",
+        }}
+      />
     </Stack>
   );
 }
@@ -79,15 +87,17 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <PlaybackProvider>
-        <ThemeProvider
-          value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
-        >
-          <RootLayoutNav />
-          <StatusBar
-            style={colorScheme === "dark" ? "light" : "dark"}
-            translucent
-          />
-        </ThemeProvider>
+        <ListeningHistoryProvider>
+          <ThemeProvider
+            value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
+          >
+            <RootLayoutNav />
+            <StatusBar
+              style={colorScheme === "dark" ? "light" : "dark"}
+              translucent
+            />
+          </ThemeProvider>
+        </ListeningHistoryProvider>
       </PlaybackProvider>
     </AuthProvider>
   );
