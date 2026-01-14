@@ -29,7 +29,7 @@ export const Colors = {
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
-    card: '#1E1F21',
+    card: '#252527',
     gradient: ['#151718ff', '#151718ff', '#1E1F21ff', '#151718ff'],
   },
 };

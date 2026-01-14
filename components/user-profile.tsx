@@ -5,10 +5,9 @@ import TabNavigation from "@/components/tab-navigation";
 import { Colors, Fonts } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import useUserContent from "@/hooks/useUserContent";
 import followApi from "@/services/followApi";
-import listeningHistoryApi from "@/services/listeningHistoryApi";
 import profileApi from "@/services/profileApi";
-import userDataApi from "@/services/userDataApi";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useFocusEffect } from "@react-navigation/native";
 import { Image } from "expo-image";
@@ -31,6 +30,8 @@ type TabType = string;
 
 const PAGE_SIZE = 50;
 
+// Main user profile component
+// If `userId` prop is provided, shows that user's profile; otherwise shows current user's profile
 export default function UserProfile({ userId }: { userId?: number }) {
   const insets = useSafeAreaInsets();
 
@@ -40,12 +41,8 @@ export default function UserProfile({ userId }: { userId?: number }) {
   const colors = Colors[isDark ? "dark" : "light"];
   const [activeTab, setActiveTab] = useState<TabType>("history");
   const [profileData, setProfileData] = useState<any>(null);
-  const [historyData, setHistoryData] = useState<any>(null);
-  const [playlistsData, setPlaylistsData] = useState<any>(null);
-  const [likedSongsData, setLikedSongsData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
 
   // Follow state
   const [followCounts, setFollowCounts] = useState<{
@@ -58,10 +55,21 @@ export default function UserProfile({ userId }: { userId?: number }) {
   // Pagination state for each tab
   const [historyOffset, setHistoryOffset] = useState(0);
   const [likedOffset, setLikedOffset] = useState(0);
-  const [hasMoreHistory, setHasMoreHistory] = useState(true);
-  const [hasMoreLiked, setHasMoreLiked] = useState(true);
 
   const scrollViewRef = useRef<ScrollView>(null);
+
+  const {
+    recentTracks,
+    likedTracks,
+    playlists,
+    followedArtists,
+    loading: contentLoading,
+    fetchRecentTracks,
+    fetchLikedTracks,
+    fetchPlaylists,
+    fetchFollowedArtists,
+    refreshAll,
+  } = useUserContent(userId);
 
   // Determine if viewing own profile or another user's profile
   const isOwnProfile = !userId;
@@ -141,13 +149,10 @@ export default function UserProfile({ userId }: { userId?: number }) {
 
     switch (activeTab) {
       case "history":
-        const groupedHistory = groupConsecutiveAlbums(historyData?.items || []);
+        const groupedHistory = groupConsecutiveAlbums(recentTracks || []);
 
         return (
           <View>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Recently Played
-            </Text>
             {groupedHistory.map((group: any, index: number) => {
               if (group.tracks.length > 1) {
                 // Multiple consecutive tracks from same album - show as album group
@@ -174,12 +179,12 @@ export default function UserProfile({ userId }: { userId?: number }) {
                 );
               }
             })}
-            {loadingMore && activeTab === "history" && (
+            {contentLoading.tracks && (
               <View style={styles.loadMoreContainer}>
                 <ActivityIndicator size="small" color="#538ce9ff" />
               </View>
             )}
-            {!hasMoreHistory && historyData?.items?.length > 0 && (
+            {!contentLoading.tracks && recentTracks?.length === 0 && (
               <Text style={[styles.endOfListText, { color: colors.text }]}>
                 No more history to load
               </Text>
@@ -189,16 +194,9 @@ export default function UserProfile({ userId }: { userId?: number }) {
       case "playlists":
         return (
           <View style={styles.contentSection}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              {isOwnProfile ? "Your Playlists" : "Playlists"}
-            </Text>
-            {playlistsData?.items
+            {playlists
               ?.filter((playlist: any) =>
-                // For own profile, filter to show only owned playlists
-                // For other users, show all playlists they have (could add owner filter based on their spotifyId)
-                isOwnProfile
-                  ? playlist.owner.id === profileData?.spotifyId
-                  : true
+                isOwnProfile ? playlist.owner.id === profileData?.spotifyId : true
               )
               .map((playlist: any) => (
                 <PlaylistItem
@@ -215,10 +213,7 @@ export default function UserProfile({ userId }: { userId?: number }) {
       case "liked":
         return (
           <View style={styles.contentSection}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              {isOwnProfile ? "Liked Songs" : "Liked Songs"}
-            </Text>
-            {likedSongsData?.items?.map((item: any, index: number) => (
+            {likedTracks?.map((item: any, index: number) => (
               <SongItem
                 key={`${item.track.id}-${index}`}
                 id={item.track.id}
@@ -230,12 +225,12 @@ export default function UserProfile({ userId }: { userId?: number }) {
                 link={`/song/${item.track.id}` as RelativePathString}
               />
             ))}
-            {loadingMore && activeTab === "liked" && (
+            {contentLoading.tracks && (
               <View style={styles.loadMoreContainer}>
                 <ActivityIndicator size="small" color="#538ce9ff" />
               </View>
             )}
-            {!hasMoreLiked && likedSongsData?.items?.length > 0 && (
+            {!contentLoading.tracks && likedTracks?.length === 0 && (
               <Text style={[styles.endOfListText, { color: colors.text }]}>
                 No more liked songs to load
               </Text>
@@ -270,8 +265,11 @@ export default function UserProfile({ userId }: { userId?: number }) {
           console.error("Failed to fetch profile:", error);
         }
       };
-
       fetchProfileData();
+      // prime hook-managed content for this profile
+      fetchRecentTracks(PAGE_SIZE, 0, true).catch(() => {});
+      fetchLikedTracks(PAGE_SIZE, 0, true).catch(() => {});
+      fetchPlaylists(true).catch(() => {});
     }, [isAuthenticated, userId])
   );
 
@@ -294,144 +292,39 @@ export default function UserProfile({ userId }: { userId?: number }) {
     }
   }, [userId, isFollowing, followLoading]);
 
-  const fetchHistory = useCallback(
-    async (refresh = false) => {
-      if (!isAuthenticated) return;
+  // recent tracks are loaded via the useUserContent hook
 
-      const currentOffset = refresh ? 0 : historyOffset;
-      if (refresh) {
-        setRefreshing(true);
-      } else if (currentOffset === 0) {
-        setLoading(true);
-      } else {
-        setLoadingMore(true);
-      }
+  // playlists are loaded via the useUserContent hook; wrapper kept for compatibility
+  const loadPlaylists = useCallback(async (refresh = false) => {
+    if (!isAuthenticated) return;
+    setLoading(true);
+    try {
+      await fetchPlaylists(true);
+    } catch (e) {
+      console.error("Failed to fetch playlists:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [isAuthenticated, fetchPlaylists]);
 
-      try {
-        const data = await listeningHistoryApi.getEnrichedListeningHistory(
-          PAGE_SIZE,
-          currentOffset,
-          userId // Pass userId for other users, undefined for current user
-        );
-        if (refresh || currentOffset === 0) {
-          setHistoryData(data);
-          setHistoryOffset(PAGE_SIZE);
-        } else {
-          setHistoryData((prev: any) => ({
-            ...data,
-            items: [...(prev?.items || []), ...(data?.items || [])],
-          }));
-          setHistoryOffset(currentOffset + PAGE_SIZE);
-        }
-        setHasMoreHistory((data?.items?.length || 0) >= PAGE_SIZE);
-      } catch (error) {
-        console.error("Failed to fetch listening history:", error);
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-        setLoadingMore(false);
-      }
-    },
-    [isAuthenticated, historyOffset, userId]
-  );
-
-  const fetchPlaylists = useCallback(
-    async (refresh = false) => {
-      if (!isAuthenticated) return;
-      if (refresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-      try {
-        const data = await userDataApi.getPlaylists(userId);
-        setPlaylistsData(data);
-      } catch (error) {
-        console.error("Failed to fetch playlists:", error);
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [isAuthenticated, userId]
-  );
-
-  const fetchLikedSongs = useCallback(
-    async (refresh = false) => {
-      if (!isAuthenticated) return;
-
-      const currentOffset = refresh ? 0 : likedOffset;
-      if (refresh) {
-        setRefreshing(true);
-      } else if (currentOffset === 0) {
-        setLoading(true);
-      } else {
-        setLoadingMore(true);
-      }
-
-      try {
-        const data = await userDataApi.getLikedTracks(
-          PAGE_SIZE,
-          currentOffset,
-          userId
-        );
-        if (refresh || currentOffset === 0) {
-          setLikedSongsData(data);
-          setLikedOffset(PAGE_SIZE);
-        } else {
-          setLikedSongsData((prev: any) => ({
-            ...data,
-            items: [...(prev?.items || []), ...(data?.items || [])],
-          }));
-          setLikedOffset(currentOffset + PAGE_SIZE);
-        }
-        setHasMoreLiked((data?.items?.length || 0) >= PAGE_SIZE);
-      } catch (error) {
-        console.error("Failed to fetch liked songs:", error);
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-        setLoadingMore(false);
-      }
-    },
-    [isAuthenticated, likedOffset, userId]
-  );
+  // liked tracks are managed by the useUserContent hook
 
   const onRefresh = useCallback(() => {
     switch (activeTab) {
       case "history":
-        fetchHistory(true);
+        fetchRecentTracks(PAGE_SIZE, 0, true);
         break;
       case "playlists":
-        fetchPlaylists(true);
+        loadPlaylists(true);
         break;
       case "liked":
-        fetchLikedSongs(true);
+        fetchLikedTracks(PAGE_SIZE, 0, true);
         break;
     }
-  }, [activeTab, fetchHistory, fetchPlaylists, fetchLikedSongs]);
+  }, [activeTab, fetchRecentTracks, loadPlaylists, fetchLikedTracks]);
 
-  const loadMore = useCallback(() => {
-    if (loadingMore || loading) return;
-
-    switch (activeTab) {
-      case "history":
-        if (hasMoreHistory) fetchHistory(false);
-        break;
-      case "liked":
-        if (hasMoreLiked) fetchLikedSongs(false);
-        break;
-      // Playlists don't have pagination in current implementation
-    }
-  }, [
-    activeTab,
-    loadingMore,
-    loading,
-    hasMoreHistory,
-    hasMoreLiked,
-    fetchHistory,
-    fetchLikedSongs,
-  ]);
+  // pagination/load-more handled by hook or not supported here; no-op
+  const loadMore = useCallback(() => {}, [activeTab]);
 
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -441,47 +334,41 @@ export default function UserProfile({ userId }: { userId?: number }) {
       const isCloseToBottom =
         layoutMeasurement.height + contentOffset.y >=
         contentSize.height - paddingToBottom;
-
-      if (isCloseToBottom && !loadingMore && !loading) {
-        loadMore();
-      }
+      // infinite scroll disabled when using hook-managed content
     },
-    [loadMore, loadingMore, loading]
+    []
   );
 
   // Reset data when userId changes (navigating to different profile)
   useEffect(() => {
     setProfileData(null);
-    setHistoryData(null);
-    setPlaylistsData(null);
-    setLikedSongsData(null);
     setHistoryOffset(0);
     setLikedOffset(0);
-    setHasMoreHistory(true);
-    setHasMoreLiked(true);
     setActiveTab("history");
     setFollowCounts({ followers: 0, following: 0 });
     setIsFollowing(false);
+    // refresh hook-managed content for the new profile
+    fetchRecentTracks(PAGE_SIZE, 0, true).catch(() => {});
+    fetchLikedTracks(PAGE_SIZE, 0, true).catch(() => {});
+    fetchPlaylists(true).catch(() => {});
   }, [userId]);
 
   // Initial data load when tab changes (only if data not already loaded)
   useEffect(() => {
     switch (activeTab) {
       case "history":
-        if (!historyData) {
+        if (!recentTracks || recentTracks.length === 0) {
           setHistoryOffset(0);
-          setHasMoreHistory(true);
-          fetchHistory(false);
+          fetchRecentTracks(PAGE_SIZE, 0, true).catch(() => {});
         }
         break;
       case "playlists":
-        if (!playlistsData) fetchPlaylists(false);
+        if (!playlists || playlists.length === 0) fetchPlaylists(true).catch(() => {});
         break;
       case "liked":
-        if (!likedSongsData) {
+        if (!likedTracks || likedTracks.length === 0) {
           setLikedOffset(0);
-          setHasMoreLiked(true);
-          fetchLikedSongs(false);
+          fetchLikedTracks(PAGE_SIZE, 0, true).catch(() => {});
         }
         break;
     }

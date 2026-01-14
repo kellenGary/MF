@@ -70,6 +70,13 @@ function RootLayoutNav() {
           sheetGrabberVisible: true,
         }}
       />
+      <Stack.Screen
+        name="post-preview"
+        options={{
+          presentation: "modal",
+          animation: "slide_from_right",
+        }}
+      />
     </Stack>
   );
 }

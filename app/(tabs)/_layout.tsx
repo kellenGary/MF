@@ -25,6 +25,10 @@ export default function TabLayout() {
           <Label hidden />
           <Icon sf="map.fill" drawable="custom_settings_drawable" />
         </NativeTabs.Trigger>
+        <NativeTabs.Trigger name="post">
+          <Label hidden />
+          <Icon sf="plus.circle.fill" drawable="custom_settings_drawable" />
+        </NativeTabs.Trigger>
         <NativeTabs.Trigger name="explore">
           <Label hidden />
           <Icon

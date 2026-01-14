@@ -24,7 +24,13 @@ class ProfileApiService {
   async getProfileStats(): Promise<any> {
     const response = await api.makeAuthenticatedRequest('/api/profile/stats');
     return await response.json();
-  }    
+  }
+
+  async checkHandleExists(handle: string): Promise<boolean> {
+    const response = await api.makeAuthenticatedRequest(`/api/profile/handle-exists?handle=${encodeURIComponent(handle)}`);
+    const data = await response.json();
+    return data.exists;
+  }
 }
 
 export default new ProfileApiService();
