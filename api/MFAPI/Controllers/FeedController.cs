@@ -84,6 +84,7 @@ public class FeedController : ControllerBase
             .Include(p => p.Album)
             .Include(p => p.Playlist)
             .Include(p => p.Artist)
+            .Include(p => p.ListeningSession)
             .Select(p => new FeedPostDto
             {
                 Id = p.Id,
@@ -127,7 +128,8 @@ public class FeedController : ControllerBase
                     Name = p.Artist.Name,
                     ImageUrl = p.Artist.ImageUrl
                 } : null,
-                MetadataJson = p.MetadataJson
+                MetadataJson = p.MetadataJson,
+                ListeningSessionId = p.ListeningSessionId
             })
             .ToListAsync();
 
@@ -195,6 +197,7 @@ public class FeedController : ControllerBase
             .Include(p => p.Album)
             .Include(p => p.Playlist)
             .Include(p => p.Artist)
+            .Include(p => p.ListeningSession)
             .Select(p => new FeedPostDto
             {
                 Id = p.Id,
@@ -238,7 +241,8 @@ public class FeedController : ControllerBase
                     Name = p.Artist.Name,
                     ImageUrl = p.Artist.ImageUrl
                 } : null,
-                MetadataJson = p.MetadataJson
+                MetadataJson = p.MetadataJson,
+                ListeningSessionId = p.ListeningSessionId
             })
             .ToListAsync();
 
@@ -272,6 +276,7 @@ public class FeedPostDto
     public FeedPlaylistDto? Playlist { get; set; }
     public FeedArtistDto? Artist { get; set; }
     public string? MetadataJson { get; set; }
+    public int? ListeningSessionId { get; set; }
 }
 
 public class FeedUserDto

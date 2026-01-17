@@ -5,6 +5,7 @@ import TabNavigation from "@/components/tab-navigation";
 import { Colors, Fonts } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import useTrackStreaks from "@/hooks/useTrackStreaks";
 import useUserContent from "@/hooks/useUserContent";
 import profileApi, { ProfileData } from "@/services/profileApi";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
@@ -68,6 +69,10 @@ export default function UserProfile({ userId }: { userId?: number }) {
     resetPagination,
   } = useUserContent(userId);
 
+  // Track streaks hook - use profileData.id for the effective user ID
+  const effectiveUserId = userId ?? profileData?.id;
+  const { getStreak } = useTrackStreaks(effectiveUserId);
+
   // Determine if viewing own profile or another user's profile
   const isOwnProfile = !userId;
 
@@ -98,6 +103,7 @@ export default function UserProfile({ userId }: { userId?: number }) {
         // Add track to current album group
         currentAlbumGroup.tracks.push({
           id: track.id,
+          spotifyId: track.spotify_id,
           name: track.name,
           artists: track.artists,
           played_at: item.played_at || item.playedAt,
@@ -118,6 +124,7 @@ export default function UserProfile({ userId }: { userId?: number }) {
           tracks: [
             {
               id: track.id,
+              spotifyId: track.spotify_id,
               name: track.name,
               artists: track.artists || [],
               played_at: item.played_at || item.playedAt,
@@ -172,6 +179,9 @@ export default function UserProfile({ userId }: { userId?: number }) {
                       .join(", ")}
                     cover={group.albumCover}
                     link={`/song/${track.id}` as RelativePathString}
+                    streak={
+                      track.spotifyId ? getStreak(track.spotifyId) : undefined
+                    }
                   />
                 );
               }

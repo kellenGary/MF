@@ -68,6 +68,11 @@ export interface FeedPost {
   playlist: FeedPlaylist | null;
   artist: FeedArtist | null;
   metadataJson: string | null;
+  listeningSessionId: number | null;
+}
+
+export interface FeedListeningSessionPost extends FeedPost {
+  tracks: FeedTrack[];
 }
 
 export interface FeedResponse {
@@ -77,10 +82,10 @@ export interface FeedResponse {
   offset: number;
 }
 
-export type PostType = 
-  | "Play" 
-  | "LikedTrack" 
-  | "LikedAlbum" 
+export type PostType =
+  | "Play"
+  | "LikedTrack"
+  | "LikedAlbum"
   | "PlaylistAdd"
   | "ListeningSession"
   | "LikedPlaylist"
@@ -159,7 +164,7 @@ class FeedApiService {
    */
   getPostDescription(post: FeedPost): string {
     const userName = post.user.displayName || post.user.handle || "Someone";
-    
+
     switch (post.type) {
       case "Play":
         return `${userName} listened to "${post.track?.name}"`;
@@ -173,7 +178,9 @@ class FeedApiService {
         return `${userName} added a track to "${post.playlist?.name}"`;
       case "ListeningSession":
         const metadata = this.parseListeningSessionMetadata(post);
-        return `${userName} listened to ${metadata?.trackCount || 'some'} tracks`;
+        return `${userName} listened to ${
+          metadata?.trackCount || "some"
+        } tracks`;
       case "SharedTrack":
         return `${userName} shared "${post.track?.name}"`;
       case "SharedAlbum":
@@ -201,7 +208,9 @@ class FeedApiService {
   /**
    * Parse the listening session metadata from a post
    */
-  parseListeningSessionMetadata(post: FeedPost): ListeningSessionMetadata | null {
+  parseListeningSessionMetadata(
+    post: FeedPost
+  ): ListeningSessionMetadata | null {
     if (post.type !== "ListeningSession" || !post.metadataJson) return null;
     try {
       return JSON.parse(post.metadataJson) as ListeningSessionMetadata;
@@ -215,7 +224,12 @@ class FeedApiService {
    */
   parseSharedPostMetadata(post: FeedPost): SharedPostMetadata | null {
     if (!post.metadataJson) return null;
-    const sharedTypes: PostType[] = ["SharedTrack", "SharedAlbum", "SharedPlaylist", "SharedArtist"];
+    const sharedTypes: PostType[] = [
+      "SharedTrack",
+      "SharedAlbum",
+      "SharedPlaylist",
+      "SharedArtist",
+    ];
     if (!sharedTypes.includes(post.type)) return null;
     try {
       const parsed = JSON.parse(post.metadataJson);
@@ -257,7 +271,12 @@ class FeedApiService {
    * Check if a post type is a "shared" post
    */
   isSharedPost(type: PostType): boolean {
-    return ["SharedTrack", "SharedAlbum", "SharedPlaylist", "SharedArtist"].includes(type);
+    return [
+      "SharedTrack",
+      "SharedAlbum",
+      "SharedPlaylist",
+      "SharedArtist",
+    ].includes(type);
   }
 
   /**
@@ -282,7 +301,7 @@ class FeedApiService {
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
-    
+
     return postDate.toLocaleDateString();
   }
 
@@ -295,10 +314,13 @@ class FeedApiService {
     caption?: string,
     visibility: PostVisibility = "Public"
   ): Promise<{ message: string; postId: number }> {
-    const response = await api.makeAuthenticatedRequest("/api/post/share/track", {
-      method: "POST",
-      body: JSON.stringify({ trackId, spotifyId, caption, visibility }),
-    });
+    const response = await api.makeAuthenticatedRequest(
+      "/api/post/share/track",
+      {
+        method: "POST",
+        body: JSON.stringify({ trackId, spotifyId, caption, visibility }),
+      }
+    );
 
     if (!response.ok) {
       const error = await response.json();
@@ -317,10 +339,13 @@ class FeedApiService {
     caption?: string,
     visibility: PostVisibility = "Public"
   ): Promise<{ message: string; postId: number }> {
-    const response = await api.makeAuthenticatedRequest("/api/post/share/album", {
-      method: "POST",
-      body: JSON.stringify({ albumId, spotifyId, caption, visibility }),
-    });
+    const response = await api.makeAuthenticatedRequest(
+      "/api/post/share/album",
+      {
+        method: "POST",
+        body: JSON.stringify({ albumId, spotifyId, caption, visibility }),
+      }
+    );
 
     if (!response.ok) {
       const error = await response.json();
@@ -339,10 +364,13 @@ class FeedApiService {
     caption?: string,
     visibility: PostVisibility = "Public"
   ): Promise<{ message: string; postId: number }> {
-    const response = await api.makeAuthenticatedRequest("/api/post/share/playlist", {
-      method: "POST",
-      body: JSON.stringify({ playlistId, spotifyId, caption, visibility }),
-    });
+    const response = await api.makeAuthenticatedRequest(
+      "/api/post/share/playlist",
+      {
+        method: "POST",
+        body: JSON.stringify({ playlistId, spotifyId, caption, visibility }),
+      }
+    );
 
     if (!response.ok) {
       const error = await response.json();
@@ -361,10 +389,13 @@ class FeedApiService {
     caption?: string,
     visibility: PostVisibility = "Public"
   ): Promise<{ message: string; postId: number }> {
-    const response = await api.makeAuthenticatedRequest("/api/post/share/artist", {
-      method: "POST",
-      body: JSON.stringify({ artistId, spotifyId, caption, visibility }),
-    });
+    const response = await api.makeAuthenticatedRequest(
+      "/api/post/share/artist",
+      {
+        method: "POST",
+        body: JSON.stringify({ artistId, spotifyId, caption, visibility }),
+      }
+    );
 
     if (!response.ok) {
       const error = await response.json();

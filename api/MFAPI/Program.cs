@@ -41,6 +41,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<ISpotifyTokenService, SpotifyTokenService>();
 builder.Services.AddScoped<IListeningHistoryService, ListeningHistoryService>();
+builder.Services.AddScoped<IListeningSessionService, ListeningSessionService>();
 builder.Services.AddScoped<IPlaylistSyncService, PlaylistSyncService>();
 builder.Services.AddScoped<ISavedTracksSyncService, SavedTracksSyncService>();
 builder.Services.AddScoped<PostService>();

@@ -24,15 +24,18 @@ public class ListeningHistoryService : IListeningHistoryService
     private readonly AppDbContext _context;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<ListeningHistoryService> _logger;
+    private readonly IListeningSessionService _listeningSessionService;
 
     public ListeningHistoryService(
         AppDbContext context,
         IHttpClientFactory httpClientFactory,
-        ILogger<ListeningHistoryService> logger)
+        ILogger<ListeningHistoryService> logger,
+        IListeningSessionService listeningSessionService)
     {
         _context = context;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
+        _listeningSessionService = listeningSessionService;
     }
 
     /// <summary>
@@ -291,6 +294,22 @@ public class ListeningHistoryService : IListeningHistoryService
 
             _context.ListeningHistory.Add(listeningHistory);
             await _context.SaveChangesAsync();
+
+            // Trigger session detection for automatic listening sessions
+            try
+            {
+                await _listeningSessionService.ProcessNewTrackAsync(
+                    userId,
+                    listeningHistory.Id,
+                    dbTrack.Id,
+                    playedAt,
+                    dbTrack.DurationMs);
+            }
+            catch (Exception sessionEx)
+            {
+                // Log but don't fail the main operation if session processing fails
+                _logger.LogWarning(sessionEx, "[ListeningHistory] Session processing failed for user {UserId}", userId);
+            }
 
             _logger.LogInformation("[ListeningHistory] Added currently playing for user {UserId}, track {TrackName} at ({Lat}, {Lng})",
                 userId, dbTrack.Name, latitude, longitude);

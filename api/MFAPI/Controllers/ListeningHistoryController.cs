@@ -144,6 +144,18 @@ public class ListeningHistoryController : ControllerBase
                 }
             }
 
+            // Check if this is a duplicate of the last played track for this user
+            var lastPlayed = await _context.ListeningHistory
+                .Where(h => h.UserId == userId)
+                .OrderByDescending(h => h.PlayedAt)
+                .Include(h => h.Track)
+                .FirstOrDefaultAsync();
+
+            if (lastPlayed?.Track?.SpotifyId == request.SpotifyTrackId)
+            {
+                return Ok(new { message = "Already recorded", trackName = lastPlayed.Track.Name, duplicate = true });
+            }
+
             var accessToken = await _spotifyTokenService.GetValidAccessTokenAsync(userId);
 
             var result = await _listeningHistoryService.AddCurrentlyPlayingAsync(
@@ -185,13 +197,9 @@ public class ListeningHistoryController : ControllerBase
             if (limit < 1 || limit > 1000) limit = 50;
             if (offset < 0) offset = 0;
 
-            var query = _context.ListeningHistory
+            // Use the enriched view for better performance
+            var query = _context.ListeningHistoryEnriched
                 .Where(h => h.UserId == userId)
-                .Include(h => h.Track)
-                    .ThenInclude(t => t.Album)
-                .Include(h => h.Track)
-                    .ThenInclude(t => t.TrackArtists)
-                        .ThenInclude(ta => ta.Artist)
                 .OrderByDescending(h => h.PlayedAt);
 
             var total = await query.CountAsync();
@@ -200,6 +208,25 @@ public class ListeningHistoryController : ControllerBase
                 .Take(limit)
                 .ToListAsync();
 
+            // Get track IDs for fetching artists
+            var trackIds = items.Select(h => h.TrackId).Distinct().ToList();
+            
+            // Fetch artists separately (view doesn't aggregate them)
+            var trackArtists = await _context.TrackArtists
+                .Where(ta => trackIds.Contains(ta.TrackId))
+                .Include(ta => ta.Artist)
+                .OrderBy(ta => ta.ArtistOrder)
+                .ToListAsync();
+            
+            var artistsByTrackId = trackArtists
+                .GroupBy(ta => ta.TrackId)
+                .ToDictionary(g => g.Key, g => g.Select(ta => new
+                {
+                    id = ta.Artist.Id,
+                    spotify_id = ta.Artist.SpotifyId,
+                    name = ta.Artist.Name
+                }).ToList());
+
             var enrichedItems = items.Select(h => new
             {
                 id = h.Id,
@@ -207,32 +234,24 @@ public class ListeningHistoryController : ControllerBase
                 ms_played = h.MsPlayed,
                 context_uri = h.ContextUri,
                 device_type = h.DeviceType,
-                source = h.Source.ToString(),
+                source = ((Models.ListeningSource)h.Source).ToString(),
                 track = new
                 {
-                    id = h.Track.Id,
-                    spotify_id = h.Track.SpotifyId,
-                    name = h.Track.Name,
-                    duration_ms = h.Track.DurationMs,
-                    @explicit = h.Track.Explicit,
-                    popularity = h.Track.Popularity,
-                    album = h.Track.Album != null ? new
+                    id = h.TrackId,
+                    spotify_id = h.TrackSpotifyId,
+                    name = h.TrackName,
+                    duration_ms = h.DurationMs,
+                    @explicit = h.Explicit,
+                    popularity = h.Popularity,
+                    album = h.AlbumId.HasValue ? new
                     {
-                        id = h.Track.Album.Id,
-                        spotify_id = h.Track.Album.SpotifyId,
-                        name = h.Track.Album.Name,
-                        image_url = h.Track.Album.ImageUrl,
-                        release_date = h.Track.Album.ReleaseDate
+                        id = h.AlbumId.Value,
+                        spotify_id = h.AlbumSpotifyId,
+                        name = h.AlbumName,
+                        image_url = h.AlbumImageUrl,
+                        release_date = h.AlbumReleaseDate
                     } : null,
-                    artists = h.Track.TrackArtists
-                        .OrderBy(ta => ta.ArtistOrder)
-                        .Select(ta => new
-                        {
-                            id = ta.Artist.Id,
-                            spotify_id = ta.Artist.SpotifyId,
-                            name = ta.Artist.Name
-                        })
-                        .ToList()
+                    artists = artistsByTrackId.GetValueOrDefault(h.TrackId) ?? []
                 }
             }).ToList();
 
@@ -278,13 +297,9 @@ public class ListeningHistoryController : ControllerBase
             if (limit < 1 || limit > 1000) limit = 50;
             if (offset < 0) offset = 0;
 
-            var query = _context.ListeningHistory
+            // Use the enriched view for better performance
+            var query = _context.ListeningHistoryEnriched
                 .Where(h => h.UserId == userId)
-                .Include(h => h.Track)
-                    .ThenInclude(t => t.Album)
-                .Include(h => h.Track)
-                    .ThenInclude(t => t.TrackArtists)
-                        .ThenInclude(ta => ta.Artist)
                 .OrderByDescending(h => h.PlayedAt);
 
             var total = await query.CountAsync();
@@ -293,6 +308,25 @@ public class ListeningHistoryController : ControllerBase
                 .Take(limit)
                 .ToListAsync();
 
+            // Get track IDs for fetching artists
+            var trackIds = items.Select(h => h.TrackId).Distinct().ToList();
+            
+            // Fetch artists separately (view doesn't aggregate them)
+            var trackArtists = await _context.TrackArtists
+                .Where(ta => trackIds.Contains(ta.TrackId))
+                .Include(ta => ta.Artist)
+                .OrderBy(ta => ta.ArtistOrder)
+                .ToListAsync();
+            
+            var artistsByTrackId = trackArtists
+                .GroupBy(ta => ta.TrackId)
+                .ToDictionary(g => g.Key, g => g.Select(ta => new
+                {
+                    id = ta.Artist.Id,
+                    spotify_id = ta.Artist.SpotifyId,
+                    name = ta.Artist.Name
+                }).ToList());
+
             var enrichedItems = items.Select(h => new
             {
                 id = h.Id,
@@ -300,32 +334,24 @@ public class ListeningHistoryController : ControllerBase
                 ms_played = h.MsPlayed,
                 context_uri = h.ContextUri,
                 device_type = h.DeviceType,
-                source = h.Source.ToString(),
+                source = ((Models.ListeningSource)h.Source).ToString(),
                 track = new
                 {
-                    id = h.Track.Id,
-                    spotify_id = h.Track.SpotifyId,
-                    name = h.Track.Name,
-                    duration_ms = h.Track.DurationMs,
-                    @explicit = h.Track.Explicit,
-                    popularity = h.Track.Popularity,
-                    album = h.Track.Album != null ? new
+                    id = h.TrackId,
+                    spotify_id = h.TrackSpotifyId,
+                    name = h.TrackName,
+                    duration_ms = h.DurationMs,
+                    @explicit = h.Explicit,
+                    popularity = h.Popularity,
+                    album = h.AlbumId.HasValue ? new
                     {
-                        id = h.Track.Album.Id,
-                        spotify_id = h.Track.Album.SpotifyId,
-                        name = h.Track.Album.Name,
-                        image_url = h.Track.Album.ImageUrl,
-                        release_date = h.Track.Album.ReleaseDate
+                        id = h.AlbumId.Value,
+                        spotify_id = h.AlbumSpotifyId,
+                        name = h.AlbumName,
+                        image_url = h.AlbumImageUrl,
+                        release_date = h.AlbumReleaseDate
                     } : null,
-                    artists = h.Track.TrackArtists
-                        .OrderBy(ta => ta.ArtistOrder)
-                        .Select(ta => new
-                        {
-                            id = ta.Artist.Id,
-                            spotify_id = ta.Artist.SpotifyId,
-                            name = ta.Artist.Name
-                        })
-                        .ToList()
+                    artists = artistsByTrackId.GetValueOrDefault(h.TrackId) ?? []
                 }
             }).ToList();
 
@@ -423,6 +449,104 @@ public class ListeningHistoryController : ControllerBase
             _logger.LogError(ex, "Error getting listening history with location");
             return StatusCode(500, new { error = "Internal server error" });
         }
+    }
+
+    /// <summary>
+    /// Gets consecutive day streaks for all tracks played by a user.
+    /// Returns only tracks with streak >= 2 to minimize payload size.
+    /// </summary>
+    [HttpGet("streaks/{userId}")]
+    public async Task<IActionResult> GetTrackStreaks(int userId)
+    {
+        try
+        {
+            // Verify the requesting user is authenticated
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null)
+            {
+                return Unauthorized(new { error = "Invalid token" });
+            }
+
+            // Check if the target user exists
+            var targetUser = await _context.Users.FindAsync(userId);
+            if (targetUser == null)
+            {
+                return NotFound(new { error = "User not found" });
+            }
+
+            // Get today's date in UTC
+            var today = DateTime.UtcNow.Date;
+
+            // Get all listening history for the user with track info
+            var listeningHistory = await _context.ListeningHistory
+                .Where(h => h.UserId == userId)
+                .Include(h => h.Track)
+                .Select(h => new { h.Track.SpotifyId, PlayedDate = h.PlayedAt.Date })
+                .ToListAsync();
+
+            // Group by SpotifyId and calculate streaks
+            var streaks = listeningHistory
+                .GroupBy(h => h.SpotifyId)
+                .Select(g => new
+                {
+                    SpotifyId = g.Key,
+                    Streak = CalculateStreak(g.Select(x => x.PlayedDate).Distinct().ToList(), today)
+                })
+                .Where(x => x.Streak >= 2)
+                .ToDictionary(x => x.SpotifyId, x => x.Streak);
+
+            return Ok(streaks);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting track streaks for user {UserId}", userId);
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+
+    /// <summary>
+    /// Calculates the current consecutive day streak from a list of dates.
+    /// Counts backwards from today (or yesterday if no play today).
+    /// </summary>
+    private static int CalculateStreak(List<DateTime> playedDates, DateTime today)
+    {
+        if (playedDates.Count == 0) return 0;
+
+        var sortedDates = playedDates.OrderByDescending(d => d).ToList();
+        
+        // Check if chain starts today or yesterday
+        var mostRecent = sortedDates[0];
+        if (mostRecent != today && mostRecent != today.AddDays(-1))
+        {
+            return 0; // Streak is broken
+        }
+
+        int streak = 1;
+        var currentDate = mostRecent;
+
+        for (int i = 1; i < sortedDates.Count; i++)
+        {
+            var previousDate = sortedDates[i];
+            
+            // Check if this date is exactly one day before
+            if (currentDate.AddDays(-1) == previousDate)
+            {
+                streak++;
+                currentDate = previousDate;
+            }
+            else if (currentDate == previousDate)
+            {
+                // Same date, skip (already counted)
+                continue;
+            }
+            else
+            {
+                // Gap in dates, streak is broken
+                break;
+            }
+        }
+
+        return streak;
     }
 }
 

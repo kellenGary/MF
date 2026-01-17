@@ -51,6 +51,9 @@ public class Post
     public int? SourceListeningHistoryId { get; set; }
     public ListeningHistory? SourceListeningHistory { get; set; }
 
+    public int? ListeningSessionId { get; set; }
+    public ListeningSession? ListeningSession { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public PostVisibility Visibility { get; set; }
 

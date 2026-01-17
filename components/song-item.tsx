@@ -2,6 +2,7 @@ import { Colors } from "@/constants/theme";
 import { usePlayback } from "@/contexts/playbackContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import playbackApi from "@/services/playbackApi";
+import AntDesign from "@expo/vector-icons/AntDesign";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Image } from "expo-image";
 import { RelativePathString, router } from "expo-router";
@@ -14,6 +15,7 @@ interface SongItemProps {
   artist: string;
   cover: string;
   link: RelativePathString;
+  streak?: number;
 }
 
 export default function SongItem({
@@ -22,13 +24,15 @@ export default function SongItem({
   artist,
   cover,
   link,
+  streak,
 }: SongItemProps) {
   const colorScheme = useColorScheme();
   const { playbackState } = usePlayback();
   const isDark = colorScheme === "dark";
   const colors = Colors[isDark ? "dark" : "light"];
 
-  const isActive = playbackState?.item?.name === title && playbackState?.isPlaying;
+  const isActive =
+    playbackState?.item?.name === title && playbackState?.isPlaying;
 
   const handlePress = () => {
     router.push(link);
@@ -39,7 +43,14 @@ export default function SongItem({
   };
 
   return (
-    <Pressable key={id} style={[styles.songItem, { backgroundColor: isActive ? colors.card : "transparent" }]} onPress={handlePress} >
+    <Pressable
+      key={id}
+      style={[
+        styles.songItem,
+        { backgroundColor: isActive ? colors.card : "transparent" },
+      ]}
+      onPress={handlePress}
+    >
       <Image source={{ uri: cover }} style={styles.songCover} />
       <View style={styles.songInfo}>
         <Text style={[styles.songTitle, { color: colors.text }]}>{title}</Text>
@@ -48,17 +59,29 @@ export default function SongItem({
         </Text>
       </View>
 
-      {isActive ? (
-        <EqualizerBar />
-      ) : (
-        <Pressable onPress={handlePlayPress}>
-          <MaterialIcons
-            name="play-circle-outline"
-            size={28}
-            color={colors.icon}
-          />
-        </Pressable>
-      )}
+      <View style={styles.leftSide}>
+        {streak && streak > 1 ? (
+          <View style={styles.streakContainer}>
+            <AntDesign name="fire" size={24} color="#FF6B35" />
+            <Text style={[styles.streakText, { color: colors.background }]}>
+              {streak}
+            </Text>
+          </View>
+        ) : null}
+        {isActive ? (
+          <View style={{ width: 28, paddingLeft: 6}}>
+            <EqualizerBar />
+          </View>
+        ) : (
+          <Pressable onPress={handlePlayPress}>
+            <MaterialIcons
+              name="play-circle-outline"
+              size={28}
+              color={colors.icon}
+            />
+          </Pressable>
+        )}
+      </View>
     </Pressable>
   );
 }
@@ -86,5 +109,22 @@ const styles = StyleSheet.create({
   songArtist: {
     fontSize: 13,
     opacity: 0.7,
+  },
+  leftSide: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+  },
+  streakContainer: {
+    position: "relative",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  streakText: {
+    position: "absolute",
+    fontSize: 10,
+    fontWeight: "bold",
+    top: 8,
   },
 });

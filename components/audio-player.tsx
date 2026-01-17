@@ -2,19 +2,20 @@ import { Colors } from "@/constants/theme";
 import { usePlayback } from "@/contexts/playbackContext";
 import spotifyApi from "@/services/spotifyApi";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
-  Image,
   Pressable,
   StyleSheet,
   Text,
   useColorScheme,
   View,
 } from "react-native";
-const { width } = Dimensions.get("window");
-const ALBUM_ART_SIZE = width * 0.85;
+
+const { width, height } = Dimensions.get("window");
 
 export default function AudioPlayer() {
   const [isLiked, setIsLiked] = useState(false);
@@ -33,42 +34,11 @@ export default function AudioPlayer() {
   const isDark = colorScheme === "dark";
   const colors = Colors[isDark ? "dark" : "light"];
 
-  const track = playbackState.item;
-  const imageUrl = track.album?.images?.[0]?.url;
-  const artistNames = track.artists?.map((a: any) => a.name).join(", ");
-  const duration = playbackState.duration_ms || 1;
+  const track = playbackState?.item;
+  const imageUrl = track?.album?.images?.[0]?.url;
+  const artistNames = track?.artists?.map((a: any) => a.name).join(", ");
+  const duration = playbackState?.duration_ms || 1;
   const progressPercent = (currentProgressMs / duration) * 100;
-
-  useEffect(() => {
-    const checkIfLiked = async () => {
-      try {
-        const response = await spotifyApi.checkIfSongIsLiked(track.id);
-        setIsLiked(response);
-      } catch (error) {
-        console.error("Error checking if song is liked:", error);
-      }
-    };
-
-    checkIfLiked();
-  }, [track.id]);
-
-  if (isLoading && !playbackState) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color="#1DB954" />
-      </View>
-    );
-  }
-
-  if (!playbackState || !playbackState.item) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={[styles.text, { color: colors.text }]}>
-          Not currently playing anything
-        </Text>
-      </View>
-    );
-  }
 
   const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
@@ -87,123 +57,170 @@ export default function AudioPlayer() {
     }
   };
 
+  useEffect(() => {
+    const checkIfLiked = async () => {
+      if (!track?.id) return;
+      try {
+        const response = await spotifyApi.checkIfSongIsLiked(track.id);
+        setIsLiked(response);
+      } catch (error) {
+        console.error("Error checking if song is liked:", error);
+      }
+    };
+
+    checkIfLiked();
+  }, [track?.id]);
+
+  // Show loading spinner only when actively loading and no state yet
+  if (isLoading && !playbackState) {
+    return (
+      <View
+        style={[styles.container, styles.centerContent, { minHeight: height }]}
+      >
+        <ActivityIndicator size="large" color="#1DB954" />
+      </View>
+    );
+  }
+
+  // Show empty state when nothing is playing
+  if (!playbackState || !playbackState.item) {
+    return (
+      <View
+        style={[
+          styles.container,
+          styles.centerContent,
+          { backgroundColor: colors.background },
+        ]}
+      >
+        <Ionicons
+          name="musical-notes-outline"
+          size={64}
+          color={colors.text}
+          style={{ opacity: 0.5, marginBottom: 16 }}
+        />
+        <Text style={[styles.emptyText, { color: colors.text }]}>
+          Not currently playing anything
+        </Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={[styles.container]}>
-      {/* Album Art */}
-      <View style={styles.albumArtContainer}>
-        {imageUrl ? (
-          <Image
-            source={{ uri: imageUrl }}
-            style={styles.albumArt}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={[styles.albumArt, styles.placeholderArt, { backgroundColor: colors.background }]}>
-            <Ionicons name="musical-notes" size={80} color="#666" />
+    <View style={[styles.container, { minHeight: height }]}>
+      {/* Full-screen Album Art */}
+      {imageUrl ? (
+        <Image
+          source={{ uri: imageUrl }}
+          style={styles.fullscreenAlbumArt}
+          contentFit="cover"
+        />
+      ) : (
+        <View style={[styles.fullscreenAlbumArt, styles.placeholderArt]}>
+          <Ionicons name="musical-notes" size={100} color="#666" />
+        </View>
+      )}
+
+      {/* Gradient Overlay at Bottom */}
+      <LinearGradient
+        colors={["transparent", "rgba(0,0,0,0.7)", "rgba(0,0,0,0.95)"]}
+        locations={[0, 0.4, 1]}
+        style={styles.gradientOverlay}
+      />
+
+      {/* Gradient Overlay at Top */}
+      <LinearGradient
+        colors={["rgba(0,0,0,0.6)", "rgba(0,0,0,0.3)", "transparent"]}
+        locations={[0, 0.5, 1]}
+        style={styles.topGradientOverlay}
+      />
+
+      {/* Controls Overlay */}
+      <View style={styles.controlsOverlay}>
+        {/* Track Info */}
+        <View style={styles.infoContainer}>
+          <View style={styles.titleWrapper}>
+            <Text style={styles.title} numberOfLines={1}>
+              {track?.name}
+            </Text>
+            <Text style={styles.artist} numberOfLines={1}>
+              {artistNames}
+            </Text>
           </View>
-        )}
-      </View>
-
-      {/* Track Info */}
-      <View style={styles.infoContainer}>
-        <View style={styles.titleWrapper}>
-          <Text
-            style={[styles.title, isDark && styles.darkText]}
-            numberOfLines={1}
+          <Pressable
+            onPress={() => track?.id && handleLikePress(track.id)}
+            style={styles.likeButton}
           >
-            {track.name}
-          </Text>
-          <Text
-            style={[styles.artist, isDark && styles.darkSubText]}
-            numberOfLines={1}
-          >
-            {artistNames}
-          </Text>
+            <Ionicons
+              name={isLiked ? "heart" : "heart-outline"}
+              size={28}
+              color={isLiked ? "#538ce9ff" : "#fff"}
+            />
+          </Pressable>
         </View>
-        <Pressable onPress={() => handleLikePress(track.id)}>
-          <Ionicons
-            name={isLiked ? "heart" : "heart-outline"}
-            size={28}
-            color={isLiked ? "#538ce9ff" : isDark ? "#fff" : "#000"}
-          />
-        </Pressable>
-      </View>
 
-      {/* Progress Bar */}
-      <View style={styles.progressSection}>
-        <View style={styles.progressBarBg}>
-          <View
-            style={[styles.progressBarFill, { width: `${progressPercent}%` }]}
-          />
+        {/* Progress Bar */}
+        <View style={styles.progressSection}>
+          <View style={styles.progressBarBg}>
+            <View
+              style={[styles.progressBarFill, { width: `${progressPercent}%` }]}
+            />
+          </View>
+          <View style={styles.timeLabels}>
+            <Text style={styles.timeText}>{formatTime(currentProgressMs)}</Text>
+            <Text style={styles.timeText}>{formatTime(duration)}</Text>
+          </View>
         </View>
-        <View style={styles.timeLabels}>
-          <Text style={[styles.timeText, isDark && styles.darkSubText]}>
-            {formatTime(currentProgressMs)}
-          </Text>
-          <Text style={[styles.timeText, isDark && styles.darkSubText]}>
-            {formatTime(duration)}
-          </Text>
-        </View>
-      </View>
 
-      {/* Controls */}
-      <View style={styles.controlsContainer}>
-        <Pressable onPress={toggleShuffle}>
-          <Ionicons
-            name="shuffle"
-            size={28}
-            color={
-              playbackState.shuffle_state
-                ? "#538ce9ff"
-                : isDark
-                ? "#aaa"
-                : "#666"
-            }
-          />
-        </Pressable>
+        {/* Playback Controls */}
+        <View style={styles.controlsContainer}>
+          <Pressable onPress={toggleShuffle} style={styles.controlButton}>
+            <Ionicons
+              name="shuffle"
+              size={24}
+              color={
+                playbackState.shuffle_state
+                  ? "#538ce9ff"
+                  : "rgba(255,255,255,0.7)"
+              }
+            />
+          </Pressable>
 
-        <Pressable onPress={skipPrevious}>
-          <Ionicons
-            name="play-back"
-            size={36}
-            color={isDark ? "#fff" : "#000"}
-          />
-        </Pressable>
+          <Pressable onPress={skipPrevious} style={styles.controlButton}>
+            <Ionicons name="play-back" size={32} color="#fff" />
+          </Pressable>
 
-        <Pressable onPress={togglePlay} style={styles.playButton}>
-          <Ionicons
-            name={playbackState.isPlaying ? "pause-circle" : "play-circle"}
-            size={80}
-            color={isDark ? "#fff" : "#000"}
-          />
-        </Pressable>
-
-        <Pressable onPress={skipNext}>
-          <Ionicons
-            name="play-forward"
-            size={36}
-            color={isDark ? "#fff" : "#000"}
-          />
-        </Pressable>
-
-        <Pressable onPress={toggleRepeat}>
-          <Ionicons
-            name={playbackState.repeat_state === "track" ? "repeat" : "repeat"}
-            size={28}
-            color={
-              playbackState.repeat_state !== "off"
-                ? "#538ce9ff"
-                : isDark
-                ? "#aaa"
-                : "#666"
-            }
-          />
-          {playbackState.repeat_state === "track" && (
-            <View style={styles.repeatBadge}>
-              <Text style={styles.repeatBadgeText}>1</Text>
+          <Pressable onPress={togglePlay} style={styles.playButton}>
+            <View style={styles.playButtonInner}>
+              <Ionicons
+                name={playbackState.isPlaying ? "pause" : "play"}
+                size={36}
+                color="#000"
+                style={!playbackState.isPlaying && { marginLeft: 4 }}
+              />
             </View>
-          )}
-        </Pressable>
+          </Pressable>
+
+          <Pressable onPress={skipNext} style={styles.controlButton}>
+            <Ionicons name="play-forward" size={32} color="#fff" />
+          </Pressable>
+
+          <Pressable onPress={toggleRepeat} style={styles.controlButton}>
+            <Ionicons
+              name="repeat"
+              size={24}
+              color={
+                playbackState.repeat_state !== "off"
+                  ? "#538ce9ff"
+                  : "rgba(255,255,255,0.7)"
+              }
+            />
+            {playbackState.repeat_state === "track" && (
+              <View style={styles.repeatBadge}>
+                <Text style={styles.repeatBadgeText}>1</Text>
+              </View>
+            )}
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -211,119 +228,142 @@ export default function AudioPlayer() {
 
 const styles = StyleSheet.create({
   container: {
-    flexGrow: 1,
     flex: 1,
-    paddingHorizontal: 25,
-    paddingTop: 40,
+    flexGrow: 1,
     height: "100%",
-    justifyContent: "flex-start",
-    alignContent: "center",
-  },
-  albumArtContainer: {
-    width: ALBUM_ART_SIZE,
-    height: ALBUM_ART_SIZE,
-    alignSelf: "center",
-    marginTop: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 15,
-  },
-  albumArt: {
     width: "100%",
-    height: "100%",
-    borderRadius: 8,
+    backgroundColor: "#000",
   },
-  placeholderArt: {
-    backgroundColor: "#333",
+  centerContent: {
     justifyContent: "center",
     alignItems: "center",
+  },
+  fullscreenAlbumArt: {
+    ...StyleSheet.absoluteFillObject,
+    width: "100%",
+    height: "100%",
+  },
+  placeholderArt: {
+    backgroundColor: "#1a1a1a",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  gradientOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: "55%",
+  },
+  topGradientOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 100,
+  },
+  controlsOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 24,
+    paddingBottom: 80,
   },
   infoContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 40,
-    marginBottom: 20,
+    marginBottom: 24,
   },
   titleWrapper: {
     flex: 1,
-    marginRight: 10,
+    marginRight: 16,
   },
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#000",
+    color: "#fff",
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   artist: {
-    fontSize: 18,
-    color: "#666",
+    fontSize: 16,
+    color: "rgba(255,255,255,0.8)",
     marginTop: 4,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
-  darkText: {
-    color: "#fff",
-  },
-  darkSubText: {
-    color: "#b3b3b3",
+  likeButton: {
+    padding: 8,
   },
   progressSection: {
-    marginTop: 10,
+    marginBottom: 24,
   },
   progressBarBg: {
     height: 4,
-    backgroundColor: "rgba(0,0,0,0.1)",
+    backgroundColor: "rgba(255,255,255,0.3)",
     borderRadius: 2,
     overflow: "hidden",
   },
   progressBarFill: {
     height: "100%",
-    backgroundColor: "#538ce9ff",
+    backgroundColor: "#fff",
+    borderRadius: 2,
   },
   timeLabels: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 10,
+    marginTop: 8,
   },
   timeText: {
     fontSize: 12,
-    color: "#666",
+    color: "rgba(255,255,255,0.7)",
   },
   controlsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 20,
+    paddingHorizontal: 8,
+  },
+  controlButton: {
+    padding: 8,
   },
   playButton: {
-    marginHorizontal: 10,
+    marginHorizontal: 16,
+  },
+  playButtonInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   repeatBadge: {
     position: "absolute",
-    top: -2,
-    right: -2,
+    top: 2,
+    right: 2,
     backgroundColor: "#538ce9ff",
     borderRadius: 6,
-    width: 12,
-    height: 12,
+    width: 14,
+    height: 14,
     justifyContent: "center",
     alignItems: "center",
   },
   repeatBadgeText: {
-    fontSize: 8,
+    fontSize: 9,
     color: "#fff",
     fontWeight: "bold",
   },
-  footerControls: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: "auto",
-    marginBottom: 40,
-    paddingHorizontal: 10,
-  },
-  text: {
+  emptyText: {
     fontSize: 18,
-    color: "#333",
     textAlign: "center",
     marginTop: 100,
   },

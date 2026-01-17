@@ -24,7 +24,10 @@ public class AppDbContext : DbContext
     public DbSet<Follow> Follows { get; set; }
     public DbSet<Post> Posts { get; set; }
     public DbSet<SpotifySyncState> SpotifySyncStates { get; set; }
+    public DbSet<ListeningSession> ListeningSessions { get; set; }
+    public DbSet<ListeningSessionTrack> ListeningSessionTracks { get; set; }
     public DbSet<UserProfileData> UserProfileData { get; set; }
+    public DbSet<ListeningHistoryEnriched> ListeningHistoryEnriched { get; set; }
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -209,6 +212,43 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(p => p.SourceListeningHistoryId)
             .OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<Post>()
+            .HasOne(p => p.ListeningSession)
+            .WithOne(ls => ls.Post)
+            .HasForeignKey<Post>(p => p.ListeningSessionId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // Listening Sessions
+        modelBuilder.Entity<ListeningSession>()
+            .HasIndex(ls => new { ls.UserId, ls.Status });
+        modelBuilder.Entity<ListeningSession>()
+            .HasIndex(ls => new { ls.Status, ls.EndedAt });
+        modelBuilder.Entity<ListeningSession>()
+            .HasOne(ls => ls.User)
+            .WithMany()
+            .HasForeignKey(ls => ls.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ListeningSessionTrack>()
+            .HasIndex(lst => lst.ListeningSessionId);
+        modelBuilder.Entity<ListeningSessionTrack>()
+            .HasIndex(lst => new { lst.ListeningSessionId, lst.ListeningHistoryId })
+            .IsUnique();
+        modelBuilder.Entity<ListeningSessionTrack>()
+            .HasOne(lst => lst.Session)
+            .WithMany(ls => ls.SessionTracks)
+            .HasForeignKey(lst => lst.ListeningSessionId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ListeningSessionTrack>()
+            .HasOne(lst => lst.ListeningHistory)
+            .WithMany()
+            .HasForeignKey(lst => lst.ListeningHistoryId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ListeningSessionTrack>()
+            .HasOne(lst => lst.Track)
+            .WithMany()
+            .HasForeignKey(lst => lst.TrackId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // Sync state per user
         modelBuilder.Entity<SpotifySyncState>()
@@ -224,5 +264,9 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<UserProfileData>()
             .ToView("UserProfileData")
             .HasKey(u => u.UserId);
+        
+        modelBuilder.Entity<ListeningHistoryEnriched>()
+            .ToView("ListeningHistoryEnriched")
+            .HasNoKey();
     }
 }

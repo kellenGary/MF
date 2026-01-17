@@ -252,7 +252,7 @@ public class PostController : ControllerBase
                 var sessionTracks = tracks
                     .OrderBy(_ => random.Next())
                     .Take(random.Next(3, Math.Min(8, tracks.Count)))
-                    .Select(t => new ListeningSessionTrack
+                    .Select(t => new SessionTrackMetadata
                     {
                         TrackId = t.Id,
                         SpotifyId = t.SpotifyId,
@@ -379,6 +379,6 @@ public class ShareArtistRequest
 
 public class CreateListeningSessionRequest
 {
-    public List<ListeningSessionTrack> Tracks { get; set; } = new();
+    public List<SessionTrackMetadata> Tracks { get; set; } = new();
     public PostVisibility Visibility { get; set; } = PostVisibility.Public;
 }

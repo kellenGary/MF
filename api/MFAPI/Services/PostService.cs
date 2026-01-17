@@ -21,7 +21,7 @@ public class PostService
     /// </summary>
     public async Task<Post?> CreateListeningSessionPost(
         int userId, 
-        List<ListeningSessionTrack> tracks,
+        List<SessionTrackMetadata> tracks,
         PostVisibility visibility = PostVisibility.Public)
     {
         if (tracks.Count == 0) return null;
@@ -233,12 +233,12 @@ public class PostService
 // Metadata classes for JSON serialization
 public class ListeningSessionMetadata
 {
-    public List<ListeningSessionTrack> Tracks { get; set; } = new();
+    public List<SessionTrackMetadata> Tracks { get; set; } = new();
     public int TotalDurationMs { get; set; }
     public int TrackCount { get; set; }
 }
 
-public class ListeningSessionTrack
+public class SessionTrackMetadata
 {
     public int TrackId { get; set; }
     public string? SpotifyId { get; set; }
