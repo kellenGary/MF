@@ -47,6 +47,68 @@ public class DbController : ControllerBase
         return Ok(users);
     }
 
+    [HttpGet("tracks")]
+    [AllowAnonymous]
+    public async Task<IActionResult> getTracks()
+    {
+        _logger.LogInformation("[API] Fetching 50 most recent tracks from database using TrackDetailsWithArtists view");
+
+        try
+        {
+            var rows = await _context.Database
+                .SqlQueryRaw<Models.DTOs.TrackDetailsViewRow>(@"
+                    SELECT TrackId, TrackSpotifyId, TrackName, DurationMs, ""Explicit"", Popularity,
+                           AlbumId, AlbumSpotifyId, AlbumName, AlbumImageUrl, AlbumReleaseDate,
+                           ArtistId, ArtistSpotifyId, ArtistName, ArtistOrder
+                    FROM TrackDetailsWithArtists
+                    WHERE TrackId IN (
+                        SELECT DISTINCT TrackId FROM TrackDetailsWithArtists ORDER BY TrackId DESC LIMIT 50
+                    )
+                    ORDER BY TrackId DESC, ArtistOrder")
+                .ToListAsync();
+
+            // Group by track to aggregate artists
+            var tracks = rows
+                .GroupBy(r => r.TrackId)
+                .Select(g =>
+                {
+                    var first = g.First();
+                    return new
+                    {
+                        id = first.TrackId,
+                        spotify_id = first.TrackSpotifyId,
+                        name = first.TrackName,
+                        duration_ms = first.DurationMs,
+                        @explicit = first.Explicit,
+                        popularity = first.Popularity,
+                        album = first.AlbumId == null ? null : new
+                        {
+                            id = first.AlbumId,
+                            spotify_id = first.AlbumSpotifyId,
+                            name = first.AlbumName,
+                            image_url = first.AlbumImageUrl,
+                            release_date = first.AlbumReleaseDate
+                        },
+                        artists = g
+                            .Where(r => r.ArtistId != null)
+                            .OrderBy(r => r.ArtistOrder)
+                            .Select(r => new { id = r.ArtistId, spotify_id = r.ArtistSpotifyId, name = r.ArtistName, order = r.ArtistOrder })
+                            .ToList()
+                    };
+                })
+                .ToList();
+
+            _logger.LogInformation("[API] Retrieved {TrackCount} tracks with enriched data", tracks.Count);
+
+            return Ok(tracks);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching tracks from TrackDetailsWithArtists view");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+
     /// <summary>
     /// Backfills missing album and artist data for tracks
     /// </summary>

@@ -17,6 +17,7 @@ export const SCOPES = [
   "user-read-email",
   "user-read-recently-played",
   "user-library-read",
+  "user-top-read",
   "playlist-read-private",
   "playlist-read-collaborative",
   "user-modify-playback-state",

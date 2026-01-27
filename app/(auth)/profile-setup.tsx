@@ -28,7 +28,7 @@ export default function ProfileSetupScreen() {
   const [loading, setLoading] = useState(true);
   const [appProfile, setAppProfile] = useState<User | null>(null);
   const [spotifyProfile, setSpotifyProfile] = useState<SpotifyProfile | null>(
-    null
+    null,
   );
 
   const [displayName, setDisplayName] = useState<string>("");
@@ -49,7 +49,7 @@ export default function ProfileSetupScreen() {
         const defaultHandle =
           ap?.handle ??
           (sp?.display_name
-            ? `@${sp.display_name.replace(/\s+/g, "").toLowerCase()}`
+            ? sp.display_name.replace(/\s+/g, "").toLowerCase()
             : "");
         setDisplayName(defaultDisplay);
         setHandle(defaultHandle);
@@ -126,7 +126,7 @@ export default function ProfileSetupScreen() {
             value={handle}
             onChangeText={setHandle}
             autoCapitalize="none"
-            placeholder="@yourname"
+            placeholder="yourhandle"
           />
           <Text style={styles.help}>
             Handles must be unique; you can change later.

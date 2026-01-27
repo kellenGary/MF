@@ -18,19 +18,30 @@ export default function FeedItem({ item }: { item: FeedPost }) {
   const caption = feedApi.getCaption(item);
   const isSession = item.type === "ListeningSession";
 
-  const getActionText = (type: FeedPost['type']) => {
+  const getActionText = (type: FeedPost["type"]) => {
     switch (type) {
-      case "Play": return "Listened to";
-      case "LikedTrack": return "Liked";
-      case "LikedAlbum": return "Liked album";
-      case "LikedPlaylist": return "Liked playlist";
-      case "PlaylistAdd": return "Added to playlist";
-      case "ListeningSession": return "Listening session";
-      case "SharedTrack": return "Shared";
-      case "SharedAlbum": return "Shared album";
-      case "SharedPlaylist": return "Shared playlist";
-      case "SharedArtist": return "Shared artist";
-      default: return "Shared";
+      case "Play":
+        return "Listened to";
+      case "LikedTrack":
+        return "Liked";
+      case "LikedAlbum":
+        return "Liked album";
+      case "LikedPlaylist":
+        return "Liked playlist";
+      case "PlaylistAdd":
+        return "Added to playlist";
+      case "ListeningSession":
+        return "Listening session";
+      case "SharedTrack":
+        return "Shared";
+      case "SharedAlbum":
+        return "Shared album";
+      case "SharedPlaylist":
+        return "Shared playlist";
+      case "SharedArtist":
+        return "Shared artist";
+      default:
+        return "Shared";
     }
   };
 
@@ -50,22 +61,43 @@ export default function FeedItem({ item }: { item: FeedPost }) {
 
   const renderListeningSession = useCallback(() => {
     const metadata = feedApi.parseListeningSessionMetadata(item);
-    if (!metadata) return null;
+    if (!metadata || !metadata.tracks) return null;
     return (
       <View style={styles.sessionContainer}>
         <Text style={[styles.sessionInfo, { color: colors.text }]}>
-          {metadata.trackCount} tracks • {Math.round(metadata.totalDurationMs / 60000)} min
+          {metadata.trackCount} tracks •{" "}
+          {Math.round(metadata.totalDurationMs / 60000)} min
         </Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sessionTrackScroll} contentContainerStyle={styles.sessionTrackContent}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.sessionTrackScroll}
+          contentContainerStyle={styles.sessionTrackContent}
+        >
           {metadata.tracks.slice(0, 6).map((track, index) => (
-            <View key={`${track.trackId}-${index}`} style={styles.sessionTrackItem}>
-              {track.albumImageUrl && <Image source={{ uri: track.albumImageUrl }} style={styles.sessionTrackImage} />}
-              <Text style={[styles.sessionTrackName, { color: colors.text }]} numberOfLines={1}>{track.name}</Text>
+            <View
+              key={`${track.trackId}-${index}`}
+              style={styles.sessionTrackItem}
+            >
+              {track.albumImageUrl && (
+                <Image
+                  source={{ uri: track.albumImageUrl }}
+                  style={styles.sessionTrackImage}
+                />
+              )}
+              <Text
+                style={[styles.sessionTrackName, { color: colors.text }]}
+                numberOfLines={1}
+              >
+                {track.name}
+              </Text>
             </View>
           ))}
           {metadata.tracks.length > 6 && (
             <View style={styles.sessionMoreItem}>
-              <Text style={[styles.sessionMoreText, { color: colors.text }]}>+{metadata.tracks.length - 6}</Text>
+              <Text style={[styles.sessionMoreText, { color: colors.text }]}>
+                +{metadata.tracks.length - 6}
+              </Text>
             </View>
           )}
         </ScrollView>
@@ -75,30 +107,73 @@ export default function FeedItem({ item }: { item: FeedPost }) {
 
   return (
     <Pressable
-      style={[styles.feedCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' }]}
+      style={[
+        styles.feedCard,
+        {
+          backgroundColor: isDark
+            ? "rgba(255,255,255,0.03)"
+            : "rgba(0,0,0,0.03)",
+        },
+      ]}
       onPress={() => {
         if (item.track) router.push(`/song/${item.track.id}`);
       }}
     >
-      <Pressable style={styles.feedUserRow} onPress={() => router.push(`/profile/${item.user.id === user?.id ? "" : item.user.id}`)}>
-        <Image source={{ uri: item.user.profileImageUrl || "https://i.pravatar.cc/100" }} style={styles.feedUserImage} />
+      <Pressable
+        style={styles.feedUserRow}
+        onPress={() =>
+          router.push(
+            `/profile/${item.user.id === user?.id ? "" : item.user.id}`,
+          )
+        }
+      >
+        <Image
+          source={{
+            uri: item.user.profileImageUrl || "https://i.pravatar.cc/100",
+          }}
+          style={styles.feedUserImage}
+        />
         <View style={styles.feedUserInfo}>
-          <Text style={[styles.feedUserName, { color: colors.text }]}>{item.user.displayName || item.user.handle}</Text>
-          <Text style={[styles.feedTimeAgo, { color: colors.text }]}>{timeAgo}</Text>
+          <Text style={[styles.feedUserName, { color: colors.text }]}>
+            {item.user.displayName || item.user.handle}
+          </Text>
+          <Text style={[styles.feedTimeAgo, { color: colors.text }]}>
+            {timeAgo}
+          </Text>
         </View>
       </Pressable>
 
-      {caption && <Text style={[styles.feedCaption, { color: colors.text }]}>{caption}</Text>}
+      {caption && (
+        <Text style={[styles.feedCaption, { color: colors.text }]}>
+          {caption}
+        </Text>
+      )}
 
       {isSession ? (
         renderListeningSession()
       ) : (
         <View style={styles.feedContent}>
-          {imageUrl && <Image source={{ uri: imageUrl }} style={styles.feedContentImage} />}
+          {imageUrl && (
+            <Image source={{ uri: imageUrl }} style={styles.feedContentImage} />
+          )}
           <View style={styles.feedContentText}>
-            <Text style={[styles.feedAction, { color: colors.text }]}>{getActionText(item.type)}</Text>
-            <Text style={[styles.feedTrackName, { color: colors.text }]} numberOfLines={1}>{getContentName(item)}</Text>
-            {getContentSubtitle(item) && <Text style={[styles.feedArtistName, { color: colors.text }]} numberOfLines={1}>{getContentSubtitle(item)}</Text>}
+            <Text style={[styles.feedAction, { color: colors.text }]}>
+              {getActionText(item.type)}
+            </Text>
+            <Text
+              style={[styles.feedTrackName, { color: colors.text }]}
+              numberOfLines={1}
+            >
+              {getContentName(item)}
+            </Text>
+            {getContentSubtitle(item) && (
+              <Text
+                style={[styles.feedArtistName, { color: colors.text }]}
+                numberOfLines={1}
+              >
+                {getContentSubtitle(item)}
+              </Text>
+            )}
           </View>
         </View>
       )}

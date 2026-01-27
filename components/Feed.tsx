@@ -1,16 +1,23 @@
-import FeedItem from "@/components/FeedItem";
+import FeedItemRouter from "@/components/posts/FeedItemRouter";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import useFeed from "@/hooks/useFeed";
 import React from "react";
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import {
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  View,
+} from "react-native";
 
 type FeedProps = {
-  ListHeaderComponent?: React.ReactNode | null; 
+  ListHeaderComponent?: React.ReactNode | null;
 };
 
 export default function Feed({ ListHeaderComponent = null }: FeedProps) {
-  const { feedPosts, feedLoading, refreshing, handleRefresh, handleLoadMore } = useFeed();
+  const { feedPosts, feedLoading, refreshing, handleRefresh, handleLoadMore } =
+    useFeed();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const colors = Colors[isDark ? "dark" : "light"];
@@ -33,14 +40,20 @@ export default function Feed({ ListHeaderComponent = null }: FeedProps) {
   return (
     <FlatList
       data={feedPosts}
-      renderItem={({ item }) => <FeedItem item={item} />}
+      renderItem={({ item }) => <FeedItemRouter item={item} />}
       keyExtractor={(item: any) => `${item.type}-${item.id}-${item.createdAt}`}
-      ListHeaderComponent={ListHeaderComponent}
+      ListHeaderComponent={() => <>{ListHeaderComponent}</>}
       ListFooterComponent={renderFooter}
       ListEmptyComponent={renderEmpty}
       onEndReached={handleLoadMore}
       onEndReachedThreshold={0.5}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.text} />}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          tintColor={colors.text}
+        />
+      }
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.content}
     />
@@ -50,6 +63,8 @@ export default function Feed({ ListHeaderComponent = null }: FeedProps) {
 const styles = StyleSheet.create({
   content: {
     paddingBottom: 100,
+    paddingHorizontal: 16,
+    gap: 16,
   },
   footer: {
     paddingVertical: 20,

@@ -2,23 +2,132 @@ import { Colors, Fonts } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import listeningHistoryApi, {
-    LocationHistoryEntry,
+  LocationHistoryEntry,
 } from "@/services/listeningHistoryApi";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import { router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import React, {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
-    ActivityIndicator,
-    Modal,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import MapView, { Marker, Region } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+// Cluster nearby markers to reduce render count
+interface ClusteredMarker {
+  id: string;
+  latitude: number;
+  longitude: number;
+  count: number;
+  items: LocationHistoryEntry[];
+}
+
+function clusterMarkers(
+  items: LocationHistoryEntry[],
+  region: Region | null,
+  clusterRadius: number = 0.002,
+): ClusteredMarker[] {
+  if (!region || items.length === 0) return [];
+
+  const clusters: ClusteredMarker[] = [];
+  const processed = new Set<number>();
+
+  // Limit items to improve performance
+  const limitedItems = items.slice(0, 200);
+
+  for (const item of limitedItems) {
+    if (processed.has(item.id)) continue;
+
+    // Find nearby items to cluster
+    const nearby = limitedItems.filter((other) => {
+      if (processed.has(other.id)) return false;
+      const latDiff = Math.abs(item.latitude - other.latitude);
+      const lngDiff = Math.abs(item.longitude - other.longitude);
+      return latDiff < clusterRadius && lngDiff < clusterRadius;
+    });
+
+    nearby.forEach((n) => processed.add(n.id));
+
+    // Calculate cluster center
+    const avgLat =
+      nearby.reduce((sum, n) => sum + n.latitude, 0) / nearby.length;
+    const avgLng =
+      nearby.reduce((sum, n) => sum + n.longitude, 0) / nearby.length;
+
+    clusters.push({
+      id: `cluster-${item.id}`,
+      latitude: avgLat,
+      longitude: avgLng,
+      count: nearby.length,
+      items: nearby,
+    });
+  }
+
+  return clusters;
+}
+
+// Memoized marker component for better performance
+const MapMarker = memo(function MapMarker({
+  cluster,
+  onPress,
+}: {
+  cluster: ClusteredMarker;
+  onPress: (cluster: ClusteredMarker) => void;
+}) {
+  const firstItem = cluster.items[0];
+  const imageUrl = firstItem?.track.album?.image_url;
+
+  return (
+    <Marker
+      coordinate={{
+        latitude: cluster.latitude,
+        longitude: cluster.longitude,
+      }}
+      onPress={() => onPress(cluster)}
+      tracksViewChanges={false}
+    >
+      <View style={styles.markerWrapper}>
+        <View style={styles.markerContainer}>
+          {imageUrl ? (
+            <Image
+              source={{ uri: imageUrl }}
+              style={styles.markerImage}
+              cachePolicy="memory-disk"
+            />
+          ) : (
+            <View style={styles.markerPlaceholder}>
+              <MaterialIcons name="music-note" size={24} color="#fff" />
+            </View>
+          )}
+        </View>
+        {cluster.count > 1 && (
+          <View style={styles.clusterBadge}>
+            <Text style={styles.clusterBadgeText}>
+              {cluster.count > 99 ? "99+" : cluster.count}
+            </Text>
+          </View>
+        )}
+      </View>
+    </Marker>
+  );
+});
 
 export default function ListeningMapScreen() {
   const insets = useSafeAreaInsets();
@@ -26,68 +135,89 @@ export default function ListeningMapScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const colors = Colors[isDark ? "dark" : "light"];
+  const mapRef = useRef<MapView>(null);
 
   const [locationError, setLocationError] = useState<string | null>(null);
   const [historyItems, setHistoryItems] = useState<LocationHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedMarker, setSelectedMarker] =
-    useState<LocationHistoryEntry | null>(null);
+  const [selectedCluster, setSelectedCluster] =
+    useState<ClusteredMarker | null>(null);
   const [region, setRegion] = useState<Region | null>(null);
 
   // Get user's current location for initial map center
   useEffect(() => {
     async function getCurrentLocation() {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        setLocationError("Permission to access location was denied");
-        return;
-      }
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          setLocationError("Permission to access location was denied");
+          return;
+        }
 
-      const location = await Location.getCurrentPositionAsync({});
-      setRegion({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      });
+        const location = await Location.getCurrentPositionAsync({});
+        setRegion({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
+        });
+      } catch (error) {
+        console.error("Failed to get location:", error);
+      }
     }
 
     getCurrentLocation();
   }, []);
 
   // Fetch listening history with location data
-  const fetchLocationHistory = useCallback(async () => {
-    if (!isAuthenticated) return;
-
-    setLoading(true);
-    try {
-      const data = await listeningHistoryApi.getListeningHistoryWithLocation(
-        500,
-        0
-      );
-      setHistoryItems(data.items);
-
-      // If we have history items but no user location, center on first item
-      if (data.items.length > 0 && !region) {
-        setRegion({
-          latitude: data.items[0].latitude,
-          longitude: data.items[0].longitude,
-          latitudeDelta: 0.1,
-          longitudeDelta: 0.1,
-        });
-      }
-    } catch (error) {
-      console.error("Failed to fetch location history:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [isAuthenticated, region]);
-
   useEffect(() => {
-    fetchLocationHistory();
-  }, [fetchLocationHistory]);
+    async function fetchLocationHistory() {
+      if (!isAuthenticated) return;
 
-  const formatDate = (dateString: string) => {
+      setLoading(true);
+      try {
+        const data = await listeningHistoryApi.getListeningHistoryWithLocation(
+          200, // Reduced limit for better performance
+          0,
+        );
+        setHistoryItems(data.items);
+
+        // If we have history items but no user location, center on first item
+        if (data.items.length > 0 && !region) {
+          setRegion({
+            latitude: data.items[0].latitude,
+            longitude: data.items[0].longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          });
+        }
+      } catch (error) {
+        console.error("Failed to fetch location history:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchLocationHistory();
+  }, [isAuthenticated]);
+
+  // Memoize clustered markers based on region zoom level
+  const clusteredMarkers = useMemo(() => {
+    if (!region) return [];
+    // Adjust cluster radius based on zoom level
+    const clusterRadius = Math.max(region.latitudeDelta * 0.03, 0.0005);
+    return clusterMarkers(historyItems, region, clusterRadius);
+  }, [historyItems, region?.latitudeDelta]);
+
+  const handleMarkerPress = useCallback((cluster: ClusteredMarker) => {
+    setSelectedCluster(cluster);
+  }, []);
+
+  const handleRegionChange = useCallback((newRegion: Region) => {
+    setRegion(newRegion);
+  }, []);
+
+  const formatDate = useCallback((dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString(undefined, {
       month: "short",
@@ -96,7 +226,7 @@ export default function ListeningMapScreen() {
       hour: "2-digit",
       minute: "2-digit",
     });
-  };
+  }, []);
 
   if (loading && !region) {
     return (
@@ -140,122 +270,142 @@ export default function ListeningMapScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
+      <LinearGradient
+        colors={["rgba(0,0,0,0.4)", "rgba(0,0,0,0.2)", "transparent"]}
+        style={[styles.header, { paddingTop: insets.top + 8 }]}
+      >
+        <Pressable style={[styles.backButton, {backgroundColor: "colors.icon"}]} onPress={() => router.back()}>
           <MaterialIcons name="arrow-back" size={24} color="#fff" />
         </Pressable>
         <Text style={styles.headerTitle}>Listening Map</Text>
         <View style={styles.headerSpacer} />
-      </View>
+      </LinearGradient>
 
       {/* Map */}
       {region && (
         <MapView
+          ref={mapRef}
           style={styles.map}
-          region={region}
-          onRegionChangeComplete={setRegion}
-          showsUserLocation
-          showsMyLocationButton
+          initialRegion={region}
+          onRegionChangeComplete={handleRegionChange}
+          showsPointsOfInterest={false}
+          showsBuildings={false}
           userInterfaceStyle={isDark ? "dark" : "light"}
+          moveOnMarkerPress={false}
+          {...(Platform.OS === "ios" ? { loadingEnabled: true } : {})}
         >
-          {historyItems.map((item) => (
-            <Marker
-              key={item.id}
-              coordinate={{
-                latitude: item.latitude,
-                longitude: item.longitude,
-              }}
-              onPress={() => setSelectedMarker(item)}
-            >
-              <View style={styles.markerContainer}>
-                {item.track.album?.image_url ? (
-                  <Image
-                    source={{ uri: item.track.album.image_url }}
-                    style={styles.markerImage}
-                  />
-                ) : (
-                  <View style={styles.markerPlaceholder}>
-                    <MaterialIcons name="music-note" size={16} color="#fff" />
-                  </View>
-                )}
-              </View>
-            </Marker>
+          {clusteredMarkers.map((cluster) => (
+            <MapMarker
+              key={cluster.id}
+              cluster={cluster}
+              onPress={handleMarkerPress}
+            />
           ))}
         </MapView>
       )}
 
-      {/* Stats overlay */}
-      <View style={[styles.statsOverlay, { bottom: insets.bottom + 16 }]}>
-        <View style={[styles.statsCard, { backgroundColor: colors.card }]}>
-          <Text style={[styles.statsNumber, { color: colors.text }]}>
-            {historyItems.length}
-          </Text>
-          <Text style={[styles.statsLabel, { color: colors.text }]}>
-            Tracked Listens
-          </Text>
-        </View>
-      </View>
-
       {/* Selected marker modal */}
       <Modal
-        visible={selectedMarker !== null}
+        visible={selectedCluster !== null}
         transparent
         animationType="slide"
-        onRequestClose={() => setSelectedMarker(null)}
+        onRequestClose={() => setSelectedCluster(null)}
       >
         <Pressable
           style={styles.modalOverlay}
-          onPress={() => setSelectedMarker(null)}
+          onPress={() => setSelectedCluster(null)}
         >
           <View
             style={[
               styles.modalContent,
-              { backgroundColor: colors.card, paddingBottom: insets.bottom + 16 },
+              {
+                backgroundColor: colors.card,
+                paddingBottom: insets.bottom + 16,
+                maxHeight: "70%",
+              },
             ]}
+            onStartShouldSetResponder={() => true}
           >
-            {selectedMarker && (
+            <View style={styles.modalHandle} />
+            {selectedCluster && (
               <>
-                <View style={styles.modalHandle} />
-                <View style={styles.trackInfo}>
-                  {selectedMarker.track.album?.image_url ? (
-                    <Image
-                      source={{ uri: selectedMarker.track.album.image_url }}
-                      style={styles.trackImage}
-                    />
-                  ) : (
-                    <View style={[styles.trackImage, styles.trackImagePlaceholder]}>
-                      <MaterialIcons name="music-note" size={32} color="#fff" />
-                    </View>
+                <Text style={[styles.clusterInfo, { color: colors.text }]}>
+                  {selectedCluster.count === 1
+                    ? "1 song at this location"
+                    : `${selectedCluster.count} songs at this location`}
+                </Text>
+                <FlatList
+                  data={selectedCluster.items}
+                  keyExtractor={(item) => `${item.id}-${item.played_at}`}
+                  showsVerticalScrollIndicator={true}
+                  style={styles.trackList}
+                  contentContainerStyle={styles.trackListContent}
+                  renderItem={({ item }) => (
+                    <Pressable
+                      style={styles.trackListItem}
+                      onPress={() => {
+                        setSelectedCluster(null);
+                        router.push(`/song/${item.track.id}` as any);
+                      }}
+                    >
+                      {item.track.album?.image_url ? (
+                        <Image
+                          source={{ uri: item.track.album.image_url }}
+                          style={styles.trackListImage}
+                          cachePolicy="memory-disk"
+                        />
+                      ) : (
+                        <View
+                          style={[
+                            styles.trackListImage,
+                            styles.trackImagePlaceholder,
+                          ]}
+                        >
+                          <MaterialIcons
+                            name="music-note"
+                            size={24}
+                            color="#fff"
+                          />
+                        </View>
+                      )}
+                      <View style={styles.trackListDetails}>
+                        <Text
+                          style={[styles.trackListName, { color: colors.text }]}
+                          numberOfLines={1}
+                        >
+                          {item.track.name}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.trackListArtist,
+                            { color: colors.text },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {item.track.artists.map((a) => a.name).join(", ")}
+                        </Text>
+                        <Text
+                          style={[styles.trackListDate, { color: colors.text }]}
+                        >
+                          {formatDate(item.played_at)}
+                        </Text>
+                      </View>
+                      <MaterialIcons
+                        name="chevron-right"
+                        size={24}
+                        color={colors.icon}
+                      />
+                    </Pressable>
                   )}
-                  <View style={styles.trackDetails}>
-                    <Text
-                      style={[styles.trackName, { color: colors.text }]}
-                      numberOfLines={2}
-                    >
-                      {selectedMarker.track.name}
-                    </Text>
-                    <Text
-                      style={[styles.trackArtist, { color: colors.text }]}
-                      numberOfLines={1}
-                    >
-                      {selectedMarker.track.artists
-                        .map((a) => a.name)
-                        .join(", ")}
-                    </Text>
-                    <Text style={[styles.trackDate, { color: colors.text }]}>
-                      {formatDate(selectedMarker.played_at)}
-                    </Text>
-                  </View>
-                </View>
-                <Pressable
-                  style={[styles.viewTrackButton, { backgroundColor: colors.tint }]}
-                  onPress={() => {
-                    setSelectedMarker(null);
-                    router.push(`/song/${selectedMarker.track.id}` as any);
-                  }}
-                >
-                  <Text style={styles.viewTrackButtonText}>View Track</Text>
-                </Pressable>
+                  ItemSeparatorComponent={() => (
+                    <View
+                      style={[
+                        styles.trackListSeparator,
+                        { backgroundColor: colors.text },
+                      ]}
+                    />
+                  )}
+                />
               </>
             )}
           </View>
@@ -303,7 +453,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingBottom: 12,
-    backgroundColor: "rgba(0,0,0,0.3)",
   },
   headerTitle: {
     fontSize: 18,
@@ -318,25 +467,22 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.2)",
     alignItems: "center",
     justifyContent: "center",
   },
   map: {
     flex: 1,
   },
+  markerWrapper: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
   markerContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     overflow: "hidden",
-    borderWidth: 2,
-    borderColor: "#fff",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
+    backgroundColor: "#538ce9",
   },
   markerImage: {
     width: "100%",
@@ -348,6 +494,28 @@ const styles = StyleSheet.create({
     backgroundColor: "#538ce9",
     justifyContent: "center",
     alignItems: "center",
+  },
+  clusterBadge: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    backgroundColor: "#ff4444",
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  clusterBadgeText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "bold",
   },
   statsOverlay: {
     position: "absolute",
@@ -376,7 +544,6 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.5)",
   },
   modalContent: {
     borderTopLeftRadius: 24,
@@ -390,6 +557,13 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     alignSelf: "center",
     marginBottom: 20,
+  },
+  clusterInfo: {
+    fontSize: 14,
+    fontWeight: "600",
+    opacity: 0.7,
+    marginBottom: 12,
+    textAlign: "center",
   },
   trackInfo: {
     flexDirection: "row",
@@ -434,5 +608,43 @@ const styles = StyleSheet.create({
     color: "#000",
     fontSize: 16,
     fontWeight: "600",
+  },
+  trackList: {
+    maxHeight: 400,
+  },
+  trackListContent: {
+    paddingBottom: 8,
+  },
+  trackListItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    gap: 12,
+  },
+  trackListImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 6,
+  },
+  trackListDetails: {
+    flex: 1,
+    gap: 2,
+  },
+  trackListName: {
+    fontSize: 15,
+    fontWeight: "600",
+    fontFamily: Fonts.rounded,
+  },
+  trackListArtist: {
+    fontSize: 13,
+    opacity: 0.7,
+  },
+  trackListDate: {
+    fontSize: 11,
+    opacity: 0.5,
+  },
+  trackListSeparator: {
+    height: 1,
+    opacity: 0.15,
   },
 });

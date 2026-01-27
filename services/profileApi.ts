@@ -31,7 +31,7 @@ class ProfileApiService {
   }
 
   async updateAppProfile(
-    payload: Partial<Pick<User, "displayName" | "handle" | "bio">>
+    payload: Partial<Pick<User, "displayName" | "handle" | "bio">>,
   ): Promise<User> {
     const response = await api.makeAuthenticatedRequest("/api/profile/app", {
       method: "PUT",
@@ -40,12 +40,29 @@ class ProfileApiService {
     return await response.json();
   }
 
+  async getTopArtists(userId?: number): Promise<any> {
+    const endpoint = userId
+      ? `/api/profile/top-artists/${userId}`
+      : "/api/profile/top-artists";
+    const response = await api.makeAuthenticatedRequest(endpoint);
+    return await response.json();
+  }
+
   async checkHandleExists(handle: string): Promise<boolean> {
     const response = await api.makeAuthenticatedRequest(
-      `/api/profile/handle-exists?handle=${encodeURIComponent(handle)}`
+      `/api/profile/handle-exists?handle=${encodeURIComponent(handle)}`,
     );
     const data = await response.json();
     return data.exists;
+  }
+
+  async deleteAccount(): Promise<void> {
+    const response = await api.makeAuthenticatedRequest("/api/profile", {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      throw new Error("Failed to delete account");
+    }
   }
 }
 

@@ -16,6 +16,7 @@ public class AppDbContext : DbContext
     public DbSet<TrackArtist> TrackArtists { get; set; }
     public DbSet<Playlist> Playlists { get; set; }
     public DbSet<PlaylistTrack> PlaylistTracks { get; set; }
+    public DbSet<AlbumTrack> AlbumTracks { get; set; }
     public DbSet<UserLikedTrack> UserLikedTracks { get; set; }
     public DbSet<UserLikedAlbum> UserLikedAlbums { get; set; }
     public DbSet<UserFollowedArtist> UserFollowedArtists { get; set; }
@@ -55,6 +56,20 @@ public class AppDbContext : DbContext
             .HasOne(t => t.Album)
             .WithMany(a => a.Tracks)
             .HasForeignKey(t => t.AlbumId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Album tracks (for caching album track lists)
+        modelBuilder.Entity<AlbumTrack>()
+            .HasKey(at => new { at.AlbumId, at.Position });
+        modelBuilder.Entity<AlbumTrack>()
+            .HasOne(at => at.Album)
+            .WithMany()
+            .HasForeignKey(at => at.AlbumId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<AlbumTrack>()
+            .HasOne(at => at.Track)
+            .WithMany()
+            .HasForeignKey(at => at.TrackId)
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<TrackArtist>()

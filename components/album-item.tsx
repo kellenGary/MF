@@ -17,11 +17,23 @@ export default function AlbumItem({ group }: { group: any }) {
           style={styles.albumGroupCover}
         />
         <View style={styles.albumGroupInfo}>
-          <Text style={[styles.albumGroupName, { color: colors.text }]}>{group.albumName}</Text>
-          <Text style={[styles.albumGroupArtist, { color: colors.text, opacity: 0.7 }]}>
+          <Text style={[styles.albumGroupName, { color: colors.text }]}>
+            {group.albumName}
+          </Text>
+          <Text
+            style={[
+              styles.albumGroupArtist,
+              { color: colors.text, opacity: 0.7 },
+            ]}
+          >
             {group.artists.map((a: any) => a.name).join(", ")}
           </Text>
-          <Text style={[styles.albumGroupCount, { color: colors.text, opacity: 0.4 }]}>
+          <Text
+            style={[
+              styles.albumGroupCount,
+              { color: colors.text, opacity: 0.4 },
+            ]}
+          >
             {group.tracks.length} tracks played
           </Text>
         </View>
@@ -29,16 +41,17 @@ export default function AlbumItem({ group }: { group: any }) {
           name="chevron-right"
           size={28}
           color={colors.icon}
-          onPress={() => router.push(`/album/${group.albumId}` as RelativePathString)}
+          onPress={() =>
+            router.push(
+              `/album/${group.albumSpotifyId || group.albumId}` as RelativePathString,
+            )
+          }
         />
       </View>
       <View style={styles.albumTracks}>
         <View style={styles.verticalLine} />
         {group.tracks.reverse().map((track: any, trackIndex: number) => (
-          <View
-            key={`${track.id}-${trackIndex}`}
-            style={styles.albumTrackRow}
-          >
+          <View key={`${track.id}-${trackIndex}`} style={styles.albumTrackRow}>
             <View style={styles.connectorHorizontal} />
             <Pressable
               style={styles.albumTrackItem}
@@ -46,7 +59,9 @@ export default function AlbumItem({ group }: { group: any }) {
                 router.push(`/song/${track.id}` as RelativePathString)
               }
             >
-              <Text style={[styles.albumTrackName, { color: colors.text }]}>{track.name}</Text>
+              <Text style={[styles.albumTrackName, { color: colors.text }]}>
+                {track.name}
+              </Text>
             </Pressable>
           </View>
         ))}

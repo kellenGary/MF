@@ -103,8 +103,10 @@ public class AuthController : ControllerBase
             
             if (!profileResponse.IsSuccessStatusCode)
             {
-                _logger.LogError("[API] Failed to fetch Spotify profile");
-                return StatusCode(500, new { error = "Failed to fetch user profile" });
+                var profileError = await profileResponse.Content.ReadAsStringAsync();
+                _logger.LogError("[API] Failed to fetch Spotify profile. Status: {StatusCode}, Response: {Error}", 
+                    profileResponse.StatusCode, profileError);
+                return StatusCode(500, new { error = "Failed to fetch user profile", details = profileError });
             }
             
             var profileContent = await profileResponse.Content.ReadAsStringAsync();
@@ -133,7 +135,7 @@ public class AuthController : ControllerBase
                 {
                     SpotifyId = spotifyId,
                     DisplayName = displayName,
-                    Handle = displayName != null ? "@" + displayName.Replace(" ", string.Empty).ToLowerInvariant() : null,
+                    Handle = displayName != null ? displayName.Replace(" ", string.Empty).ToLowerInvariant() : null,
                     Bio = string.Empty,
                     Email = email,
                     ProfileImageUrl = profileImageUrl,
@@ -153,7 +155,7 @@ public class AuthController : ControllerBase
                 user.DisplayName = displayName;
                 if (string.IsNullOrWhiteSpace(user.Handle) && displayName != null)
                 {
-                    user.Handle = "@" + displayName.Replace(" ", string.Empty).ToLowerInvariant();
+                    user.Handle = displayName.Replace(" ", string.Empty).ToLowerInvariant();
                 }
                 user.Email = email;
                 user.ProfileImageUrl = profileImageUrl;

@@ -75,4 +75,52 @@ public class TracksController : ControllerBase
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
+
+    /// <summary>
+    /// Gets users who have liked this track (prioritizes users you follow)
+    /// </summary>
+    [HttpGet("{trackId}/fans")]
+    public async Task<IActionResult> GetTrackFans(int trackId, [FromQuery] int limit = 10)
+    {
+        try
+        {
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var currentUserId))
+            {
+                return Unauthorized(new { error = "Invalid token" });
+            }
+
+            // Get users who liked this track, prioritizing those the current user follows
+            var fans = await _context.UserLikedTracks
+                .Where(ult => ult.TrackId == trackId && ult.UserId != currentUserId)
+                .Join(_context.Users,
+                    ult => ult.UserId,
+                    u => u.Id,
+                    (ult, u) => new { ult, u })
+                .GroupJoin(_context.Follows.Where(f => f.FollowerUserId == currentUserId),
+                    x => x.u.Id,
+                    f => f.FolloweeUserId,
+                    (x, follows) => new { x.ult, x.u, IsFollowing = follows.Any() })
+                .OrderByDescending(x => x.IsFollowing)
+                .ThenByDescending(x => x.ult.LikedAt)
+                .Take(limit)
+                .Select(x => new
+                {
+                    id = x.u.Id,
+                    displayName = x.u.DisplayName,
+                    handle = x.u.Handle,
+                    profileImageUrl = x.u.ProfileImageUrl,
+                    isFollowing = x.IsFollowing,
+                    likedAt = x.ult.LikedAt
+                })
+                .ToListAsync();
+
+            return Ok(new { fans, totalCount = fans.Count });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching fans for track {TrackId}", trackId);
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
 }

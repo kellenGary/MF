@@ -1,20 +1,44 @@
+import RingCarousel from "@/components/RingCarousel";
 import { CLIENT_ID, REDIRECT_URI, SCOPES } from "@/constants/auth";
+import { Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/services/api";
 import { LinearGradient } from "expo-linear-gradient";
 import * as WebBrowser from "expo-web-browser";
-import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import {
+  Alert,
+  Dimensions,
+  Pressable,
+  StyleSheet,
+  Text,
+  useColorScheme,
+  View,
+} from "react-native";
 
 WebBrowser.maybeCompleteAuthSession();
 
 export default function SignInScreen() {
   const { signIn } = useAuth();
+  const [tracks, setTracks] = useState([]);
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const colors = Colors[isDark ? "dark" : "light"];
+
+  useEffect(() => {
+    const fetchTracks = async () => {
+      const response = await api.makeRequest("/api/db/tracks");
+      const data = await response.json();
+      setTracks(data);
+    };
+    fetchTracks();
+  }, []);
 
   const handleSpotifyCallback = async (url: string) => {
     if (!url.startsWith("mf://callback")) return;
 
     const urlParams = new URL(
-      url.replace("mf://callback/?", "http://dummy.com/?")
+      url.replace("mf://callback/?", "http://dummy.com/?"),
     );
     const code = urlParams.searchParams.get("code");
     const state = urlParams.searchParams.get("state");
@@ -39,7 +63,7 @@ export default function SignInScreen() {
   async function handleLogin() {
     const state = Math.random().toString(36).substring(7);
     const authUrl = `https://accounts.spotify.com/authorize?response_type=code&client_id=${CLIENT_ID}&scope=${encodeURIComponent(
-      SCOPES
+      SCOPES,
     )}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&state=${state}`;
 
     const result = await WebBrowser.openAuthSessionAsync(authUrl, REDIRECT_URI);
@@ -49,30 +73,32 @@ export default function SignInScreen() {
     }
   }
 
+  const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
+  const carouselHeight = screenHeight * 0.75;
+
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={["#538ce9ff", "#526ebaff","#6d8adb84", "#000000ff"]}
-        locations={[0, 0.3, 0.7, 1]}
-        style={StyleSheet.absoluteFill}
-      />
-      <View style={styles.topSection}>
-        <Image
-          source={require("../../assets/images/icon.png")}
-          style={styles.icon}
-        />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.topSection, { height: carouselHeight }]}>
+        {tracks.length > 0 && (
+          <RingCarousel
+            tracks={tracks}
+            width={screenWidth}
+            height={carouselHeight}
+          />
+        )}
       </View>
+
       <View style={styles.loginContent}>
         <View style={styles.contentWrapper}>
-          <Text style={styles.title}>Welcome to MF</Text>
-          <Text style={styles.subtitle}>
+          <Text style={[styles.title, { color: colors.text }]}>Welcome to MF</Text>
+          <Text style={[styles.subtitle, { color: colors.text }]}>
             Connect your Spotify account to discover friends and share music
           </Text>
-          <Pressable 
+          <Pressable
             style={({ pressed }) => [
               styles.button,
-              pressed && styles.buttonPressed
-            ]} 
+              pressed && styles.buttonPressed,
+            ]}
             onPress={handleLogin}
           >
             <LinearGradient
@@ -84,7 +110,7 @@ export default function SignInScreen() {
               <Text style={styles.buttonText}>Continue with Spotify</Text>
             </LinearGradient>
           </Pressable>
-          <Text style={styles.footerText}>
+          <Text style={[styles.footerText, { color: colors.text }]}>
             By continuing, you agree to share your Spotify data
           </Text>
         </View>
@@ -133,22 +159,9 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   loginContent: {
-    backgroundColor: "rgba(0, 0, 0, 0.75)",
-    backdropFilter: "blur(10px)",
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
     width: "100%",
     paddingTop: 40,
     paddingBottom: 50,
-    paddingHorizontal: 24,
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.1)",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
   },
   contentWrapper: {
     alignItems: "center",
@@ -171,7 +184,7 @@ const styles = StyleSheet.create({
   },
   button: {
     width: "100%",
-    maxWidth: 320,
+    maxWidth: 280,
     borderRadius: 28,
     overflow: "hidden",
     shadowColor: "#1DB954",
@@ -185,8 +198,7 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   buttonGradient: {
-    paddingHorizontal: 32,
-    paddingVertical: 18,
+    paddingVertical: 12,
     alignItems: "center",
     justifyContent: "center",
   },

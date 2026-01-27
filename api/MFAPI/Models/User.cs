@@ -12,7 +12,7 @@ public class User
     
     public string? DisplayName { get; set; }
     
-    // Username/handle (e.g., @example)
+    // Username/handle (e.g., example)
     public string? Handle { get; set; }
     
     // User bio text

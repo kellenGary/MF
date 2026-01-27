@@ -8,12 +8,12 @@ import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -26,24 +26,24 @@ export default function ProfileEditor() {
 
   // Local editable copy of profile fields
   const [displayName, setDisplayName] = useState<string>(
-    user?.displayName ?? ""
+    user?.displayName ?? "",
   );
   const [handle, setHandle] = useState<string>(user?.handle ?? "");
   const [bio, setBio] = useState<string>(user?.bio ?? "");
   const [profileImageUrl, setProfileImageUrl] = useState<string>(
-    user?.profileImageUrl ?? ""
+    user?.profileImageUrl ?? "",
   );
 
   const [error, setError] = useState<string | null>(null);
 
   const handleExists = async (handleToCheck: string) => {
     try {
-        return await profileApi.checkHandleExists(handleToCheck);
+      return await profileApi.checkHandleExists(handleToCheck);
     } catch (e) {
-        console.error("Failed to check handle existence:", e);
-        return false;
+      console.error("Failed to check handle existence:", e);
+      return false;
     }
-  }
+  };
 
   // Sync with auth user if it changes
   useEffect(() => {
@@ -134,7 +134,7 @@ export default function ProfileEditor() {
                 {displayName || user?.displayName || "Your Name"}
               </Text>
               <Text style={[styles.handleText, { color: colors.text }]}>
-                {handle ? handle : user?.handle || "@handle"}
+                @{handle || user?.handle || "handle"}
               </Text>
             </View>
           </View>
@@ -143,7 +143,10 @@ export default function ProfileEditor() {
         {/* Form Fields */}
         <View style={styles.field}>
           <Pressable
-            style={[styles.editPictureButton, { backgroundColor: colors.primary }]}
+            style={[
+              styles.editPictureButton,
+              { backgroundColor: colors.primary },
+            ]}
             onPress={async () => {
               // ask permission and open image picker
               const perm =
@@ -168,7 +171,9 @@ export default function ProfileEditor() {
               color="#fff"
               style={{ marginRight: 8 }}
             />
-            <Text style={[styles.editPictureText, { color: "#fff" }]}>Edit picture</Text>
+            <Text style={[styles.editPictureText, { color: "#fff" }]}>
+              Edit picture
+            </Text>
           </Pressable>
           <View>
             <Text style={[styles.label, { color: colors.text }]}>

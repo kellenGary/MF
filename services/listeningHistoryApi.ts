@@ -101,6 +101,30 @@ interface LocationHistoryResponse {
   items: LocationHistoryEntry[];
 }
 
+// Types for global location history (all users map view)
+interface LocationUserInfo {
+  id: number;
+  display_name: string;
+  avatar_url?: string;
+}
+
+export interface GlobalLocationHistoryEntry {
+  id: number;
+  played_at: string;
+  latitude: number;
+  longitude: number;
+  location_accuracy?: number;
+  user: LocationUserInfo;
+  track: LocationTrackInfo;
+}
+
+interface GlobalLocationHistoryResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  items: GlobalLocationHistoryEntry[];
+}
+
 class ListeningHistoryService {
   private lastTrackedSpotifyId: string | null = null;
 
@@ -117,7 +141,7 @@ class ListeningHistoryService {
     spotifyTrackId: string,
     progressMs: number,
     latitude?: number,
-    longitude?: number
+    longitude?: number,
   ): Promise<{ trackName?: string; error?: string }> {
     // Deduplicate on client side as well to reduce API calls
     if (this.lastTrackedSpotifyId === spotifyTrackId) {
@@ -149,7 +173,7 @@ class ListeningHistoryService {
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
 
     if (!response.ok) {
@@ -162,7 +186,7 @@ class ListeningHistoryService {
     console.log(
       "[ListeningHistory] Added currently playing:",
       data.trackName,
-      latitude ? `at (${latitude}, ${longitude})` : ""
+      latitude ? `at (${latitude}, ${longitude})` : "",
     );
     return { trackName: data.trackName };
   }
@@ -188,7 +212,7 @@ class ListeningHistoryService {
     contextUri?: string,
     deviceType?: string,
     latitude?: number,
-    longitude?: number
+    longitude?: number,
   ): Promise<void> {
     if (this.lastTrackedId === trackId) {
       return;
@@ -211,12 +235,12 @@ class ListeningHistoryService {
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
 
     if (!response.ok) {
       throw new Error(
-        `Failed to add listening history: ${response.statusText}`
+        `Failed to add listening history: ${response.statusText}`,
       );
     }
     this.lastTrackedId = trackId;
@@ -235,7 +259,7 @@ class ListeningHistoryService {
     trackId: number,
     durationMs: number,
     latitude?: number,
-    longitude?: number
+    longitude?: number,
   ): Promise<void> {
     await this.addListeningHistory(
       trackId,
@@ -244,7 +268,7 @@ class ListeningHistoryService {
       undefined,
       "smartphone",
       latitude,
-      longitude
+      longitude,
     );
   }
 
@@ -258,7 +282,7 @@ class ListeningHistoryService {
    */
   async syncRecentlyPlayed(
     latitude?: number,
-    longitude?: number
+    longitude?: number,
   ): Promise<number> {
     const body: { latitude?: number; longitude?: number } = {};
     if (latitude !== undefined && longitude !== undefined) {
@@ -274,7 +298,7 @@ class ListeningHistoryService {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(body),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -295,7 +319,7 @@ class ListeningHistoryService {
   async getListeningHistory(
     limit: number = 50,
     offset: number = 0,
-    withLocation?: boolean
+    withLocation?: boolean,
   ): Promise<ListeningHistoryResponse> {
     const params = new URLSearchParams();
     params.append("limit", Math.min(Math.max(limit, 1), 1000).toString());
@@ -305,12 +329,12 @@ class ListeningHistoryService {
     }
 
     const response = await api.makeAuthenticatedRequest(
-      `/api/listeninghistory?${params.toString()}`
+      `/api/listeninghistory?${params.toString()}`,
     );
 
     if (!response.ok) {
       throw new Error(
-        `Failed to fetch listening history: ${response.statusText}`
+        `Failed to fetch listening history: ${response.statusText}`,
       );
     }
 
@@ -322,7 +346,7 @@ class ListeningHistoryService {
    * Useful for scrolling or infinite load scenarios.
    */
   async getAllListeningHistory(
-    pageSize: number = 50
+    pageSize: number = 50,
   ): Promise<ListeningHistoryEntry[]> {
     const allEntries: ListeningHistoryEntry[] = [];
     let offset = 0;
@@ -352,7 +376,7 @@ class ListeningHistoryService {
   async getEnrichedListeningHistory(
     limit: number = 50,
     offset: number = 0,
-    userId?: number
+    userId?: number,
   ): Promise<EnrichedListeningHistoryResponse> {
     const params = new URLSearchParams();
     params.append("limit", Math.min(Math.max(limit, 1), 1000).toString());
@@ -366,7 +390,7 @@ class ListeningHistoryService {
 
     if (!response.ok) {
       throw new Error(
-        `Failed to fetch enriched listening history: ${response.statusText}`
+        `Failed to fetch enriched listening history: ${response.statusText}`,
       );
     }
 
@@ -378,7 +402,7 @@ class ListeningHistoryService {
    * Useful for scrolling or infinite load scenarios with complete track details.
    */
   async getAllEnrichedListeningHistory(
-    pageSize: number = 50
+    pageSize: number = 50,
   ): Promise<EnrichedListeningHistoryEntry[]> {
     const allEntries: EnrichedListeningHistoryEntry[] = [];
     let offset = 0;
@@ -407,19 +431,47 @@ class ListeningHistoryService {
    */
   async getListeningHistoryWithLocation(
     limit: number = 500,
-    offset: number = 0
+    offset: number = 0,
   ): Promise<LocationHistoryResponse> {
     const params = new URLSearchParams();
     params.append("limit", Math.min(Math.max(limit, 1), 1000).toString());
     params.append("offset", Math.max(offset, 0).toString());
 
     const response = await api.makeAuthenticatedRequest(
-      `/api/listeninghistory/with-location?${params.toString()}`
+      `/api/listeninghistory/with-location?${params.toString()}`,
     );
 
     if (!response.ok) {
       throw new Error(
-        `Failed to fetch listening history with location: ${response.statusText}`
+        `Failed to fetch listening history with location: ${response.statusText}`,
+      );
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Gets listening history entries with location data from ALL users for the global map.
+   * Returns entries with valid latitude and longitude coordinates from all users.
+   *
+   * @param limit - Number of records to return (1-1000, default 500)
+   * @param offset - Number of records to skip (default 0)
+   */
+  async getAllListeningHistoryWithLocation(
+    limit: number = 500,
+    offset: number = 0,
+  ): Promise<GlobalLocationHistoryResponse> {
+    const params = new URLSearchParams();
+    params.append("limit", Math.min(Math.max(limit, 1), 1000).toString());
+    params.append("offset", Math.max(offset, 0).toString());
+
+    const response = await api.makeAuthenticatedRequest(
+      `/api/listeninghistory/all-with-location?${params.toString()}`,
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch all listening history with location: ${response.statusText}`,
       );
     }
 
@@ -435,7 +487,7 @@ class ListeningHistoryService {
    */
   async getTrackStreaks(userId: number): Promise<Record<string, number>> {
     const response = await api.makeAuthenticatedRequest(
-      `/api/listeninghistory/streaks/${userId}`
+      `/api/listeninghistory/streaks/${userId}`,
     );
 
     if (!response.ok) {

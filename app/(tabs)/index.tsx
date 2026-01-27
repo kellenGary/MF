@@ -12,6 +12,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import MapView from "react-native-maps";
+import { MaterialIcons } from "@expo/vector-icons";
 
 // Main exported screen component for the Home / Feed tab.
 // Responsibilities:
@@ -22,7 +23,7 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const colors = Colors[isDark ? "dark" : "light"];
-  const { isAuthenticated, user } = useAuth();
+  const { user } = useAuth();
   const { location } = useLocation();
 
   // Feed is rendered by the `Feed` component; item rendering lives in `FeedItem`.
@@ -31,6 +32,16 @@ export default function HomeScreen() {
     <>
       {/* Hero */}
       <View style={styles.headerGradient}>
+        <Pressable
+          style={styles.notificationButton}
+          onPress={() => router.push("/notifications")}
+        >
+          <MaterialIcons
+            name="notifications-none"
+            size={24}
+            color={colors.text}
+          />
+        </Pressable>
         {/* Hero Header */}
         <View style={styles.headerContainer}>
           <Image
@@ -62,7 +73,13 @@ export default function HomeScreen() {
                   longitudeDelta: 0.01,
                 }}
                 showsUserLocation
-                showsMyLocationButton
+                scrollEnabled={false}
+                zoomEnabled={false}
+                rotateEnabled={false}
+                pitchEnabled={false}
+                showsCompass={false}
+                showsPointsOfInterest={false}
+                showsBuildings={false}
               />
             ) : (
               <View
@@ -124,6 +141,12 @@ const styles = StyleSheet.create({
     width: "100%",
     gap: 32,
   },
+  notificationButton: {
+    position: "absolute",
+    top: 4,
+    right: 0,
+    zIndex: 1,
+  },
   headerContainer: {
     width: "100%",
     flexDirection: "column",
@@ -144,7 +167,6 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     alignItems: "center",
     gap: 12,
-    paddingHorizontal: 16,
   },
   map: {
     height: 240,
@@ -155,14 +177,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "500",
     color: "black",
-    marginBottom: 12,
   },
   sectionContainer: {
     paddingHorizontal: 16,
     marginTop: 24,
   },
   feedHeaderContainer: {
-    paddingHorizontal: 16,
     marginTop: 24,
   },
 });

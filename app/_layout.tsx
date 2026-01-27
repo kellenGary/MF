@@ -78,6 +78,24 @@ function RootLayoutNav() {
           animation: "slide_from_right",
         }}
       />
+      <Stack.Screen
+        name="notifications"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [1.0],
+          sheetGrabberVisible: true,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      />
+      <Stack.Screen
+        name="artist/[id]"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [1.0],
+          sheetGrabberVisible: true,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      />
     </Stack>
   );
 }

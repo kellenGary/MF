@@ -11,6 +11,7 @@ import EqualizerBar from "./equalizer-bar";
 
 interface SongItemProps {
   id: string;
+  spotifyId?: string; // Spotify ID for playback
   title: string;
   artist: string;
   cover: string;
@@ -20,6 +21,7 @@ interface SongItemProps {
 
 export default function SongItem({
   id,
+  spotifyId,
   title,
   artist,
   cover,
@@ -39,7 +41,9 @@ export default function SongItem({
   };
 
   const handlePlayPress = async () => {
-    await playbackApi.playSong(id);
+    // Use spotifyId if provided, otherwise fall back to id (for backward compatibility)
+    const playId = spotifyId || id;
+    await playbackApi.playSong(playId);
   };
 
   return (
@@ -69,7 +73,7 @@ export default function SongItem({
           </View>
         ) : null}
         {isActive ? (
-          <View style={{ width: 28, paddingLeft: 6}}>
+          <View style={{ width: 28, paddingLeft: 6 }}>
             <EqualizerBar />
           </View>
         ) : (

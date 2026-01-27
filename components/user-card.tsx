@@ -45,7 +45,6 @@ export default function UserCard({
     router.push(`/profile/${userId}` as RelativePathString);
   };
 
-  console.log(JSON.stringify(user, null, 2));
   return (
     <Pressable
       style={[styles.userCard, { borderColor: colors.tabIconDefault }]}
@@ -66,9 +65,22 @@ export default function UserCard({
           </Text>
         )}
       </View>
-      <Text style={[styles.userName, { color: colors.text }]} numberOfLines={1}>
-        {user.displayName}
-      </Text>
+      <View style={styles.textContainer}>
+        <Text
+          style={[styles.userName, { color: colors.text }]}
+          numberOfLines={1}
+        >
+          {user.displayName}
+        </Text>
+        {user.handle && (
+          <Text
+            style={[styles.userHandle, { color: colors.tabIconDefault }]}
+            numberOfLines={1}
+          >
+            @{user.handle}
+          </Text>
+        )}
+      </View>
       <Pressable
         style={[
           styles.followButton,
@@ -107,43 +119,51 @@ export default function UserCard({
 
 const styles = StyleSheet.create({
   userCard: {
-    width: 100,
+    width: "100%",
     alignItems: "center",
     paddingVertical: 12,
     paddingHorizontal: 8,
-    borderRadius: 12,
-    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
   },
   userAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 8,
     overflow: "hidden",
+    backgroundColor: "#F0F0F0",
   },
   userAvatarImage: {
     width: "100%",
     height: "100%",
-    borderRadius: 30,
+    borderRadius: 25,
   },
   avatarText: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "700",
     color: "#fff",
   },
+  textContainer: {
+    flex: 1,
+    justifyContent: "center",
+    gap: 2,
+  },
   userName: {
+    fontSize: 15,
+    fontWeight: "600",
+    textAlign: "left",
+  },
+  userHandle: {
     fontSize: 13,
-    fontWeight: "500",
-    marginBottom: 8,
-    textAlign: "center",
+    fontWeight: "400",
+    textAlign: "left",
   },
   followButton: {
     paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 6,
-    width: "100%",
+    paddingVertical: 8,
+    borderRadius: 20,
   },
   followButtonText: {
     fontSize: 12,

@@ -536,4 +536,136 @@ public class SpotifyController : ControllerBase
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
+
+    [HttpGet("artists/{artistId}")]
+    public async Task<IActionResult> GetArtist(string artistId)
+    {
+        try
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+            {
+                return Unauthorized(new { error = "Invalid token" });
+            }
+
+            var accessToken = await _spotifyTokenService.GetValidAccessTokenAsync(userId);
+
+            var client = _httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Authorization = 
+                new AuthenticationHeaderValue("Bearer", accessToken);
+
+            var response = await client.GetAsync($"https://api.spotify.com/v1/artists/{artistId}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                _logger.LogError("Spotify API error: {Error}", error);
+                
+                return StatusCode((int)response.StatusCode, new 
+                { 
+                    error = "Failed to fetch artist from Spotify",
+                    statusCode = (int)response.StatusCode,
+                    spotifyError = error
+                });
+            }
+
+            var content = await response.Content.ReadAsStringAsync();
+            var artist = JsonSerializer.Deserialize<JsonElement>(content);
+
+            return Ok(artist);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching artist");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+
+    [HttpGet("artists/{artistId}/top-tracks")]
+    public async Task<IActionResult> GetArtistTopTracks(string artistId)
+    {
+        try
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+            {
+                return Unauthorized(new { error = "Invalid token" });
+            }
+
+            var accessToken = await _spotifyTokenService.GetValidAccessTokenAsync(userId);
+
+            var client = _httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Authorization = 
+                new AuthenticationHeaderValue("Bearer", accessToken);
+
+            var response = await client.GetAsync($"https://api.spotify.com/v1/artists/{artistId}/top-tracks?market=US");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                _logger.LogError("Spotify API error: {Error}", error);
+                
+                return StatusCode((int)response.StatusCode, new 
+                { 
+                    error = "Failed to fetch artist top tracks from Spotify",
+                    statusCode = (int)response.StatusCode,
+                    spotifyError = error
+                });
+            }
+
+            var content = await response.Content.ReadAsStringAsync();
+            var topTracks = JsonSerializer.Deserialize<JsonElement>(content);
+
+            return Ok(topTracks);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching artist top tracks");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+
+    [HttpGet("artists/{artistId}/albums")]
+    public async Task<IActionResult> GetArtistAlbums(string artistId)
+    {
+        try
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+            {
+                return Unauthorized(new { error = "Invalid token" });
+            }
+
+            var accessToken = await _spotifyTokenService.GetValidAccessTokenAsync(userId);
+
+            var client = _httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Authorization = 
+                new AuthenticationHeaderValue("Bearer", accessToken);
+
+            var response = await client.GetAsync($"https://api.spotify.com/v1/artists/{artistId}/albums?include_groups=album,single&limit=20");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                _logger.LogError("Spotify API error: {Error}", error);
+                
+                return StatusCode((int)response.StatusCode, new 
+                { 
+                    error = "Failed to fetch artist albums from Spotify",
+                    statusCode = (int)response.StatusCode,
+                    spotifyError = error
+                });
+            }
+
+            var content = await response.Content.ReadAsStringAsync();
+            var albums = JsonSerializer.Deserialize<JsonElement>(content);
+
+            return Ok(albums);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching artist albums");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
 }

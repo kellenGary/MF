@@ -1,13 +1,13 @@
-import { Platform } from 'react-native';
+import { Platform } from "react-native";
 
 // Allow overriding the API host for real devices via EXPO_PUBLIC_API_URL.
 const API_URL =
   process.env.EXPO_PUBLIC_API_URL ??
   (__DEV__
-    ? Platform.OS === 'ios'
-      ? 'http://localhost:5164'
-      : 'http://10.0.2.2:5164'
-    : 'https://your-production-api.com');
+    ? Platform.OS === "ios"
+      ? "http://localhost:5164"
+      : "http://10.0.2.2:5164"
+    : "https://your-production-api.com");
 
 export interface User {
   id: number;
@@ -44,31 +44,46 @@ class ApiService {
 
   async handleAuthCallback(code: string, state: string): Promise<AuthResponse> {
     const response = await fetch(
-      `${API_URL}/api/auth/callback?code=${code}&state=${state}`
+      `${API_URL}/api/auth/callback?code=${code}&state=${state}`,
     );
 
     if (!response.ok) {
-      throw new Error('Authentication failed');
+      throw new Error("Authentication failed");
     }
 
     const data: AuthResponse = await response.json();
     return data;
   }
 
+  // For public/unauthenticated endpoints
+  async makeRequest(
+    endpoint: string,
+    options: RequestInit = {},
+  ): Promise<Response> {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        ...options.headers,
+        "Content-Type": "application/json",
+      },
+    });
+    return response;
+  }
+
   async makeAuthenticatedRequest(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
   ): Promise<Response> {
     if (!this.token) {
-      throw new Error('Not authenticated');
+      throw new Error("Not authenticated");
     }
 
     const response = await fetch(`${API_URL}${endpoint}`, {
       ...options,
       headers: {
         ...options.headers,
-        'Authorization': `Bearer ${this.token}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.token}`,
+        "Content-Type": "application/json",
       },
     });
 
@@ -77,13 +92,11 @@ class ApiService {
       if (this.onUnauthorized) {
         this.onUnauthorized();
       }
-      throw new Error('Session expired');
+      throw new Error("Session expired");
     }
 
     return response;
   }
-
-
 }
 
 export default new ApiService();

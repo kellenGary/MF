@@ -16,6 +16,7 @@ public class PlaylistSyncResult
     public int PlaylistsAdded { get; set; }
     public int PlaylistsUpdated { get; set; }
     public int PlaylistsRemoved { get; set; }
+    public int TracksAdded { get; set; }
     public DateTime SyncedAt { get; set; }
 }
 
@@ -75,6 +76,14 @@ public class PlaylistSyncService : IPlaylistSyncService
                     ? snapProp.GetString() 
                     : null;
                 
+                // Get track count
+                int? trackCount = null;
+                if (spotifyPlaylist.TryGetProperty("tracks", out var tracksObj) && 
+                    tracksObj.TryGetProperty("total", out var totalProp))
+                {
+                    trackCount = totalProp.GetInt32();
+                }
+                
                 // Get image URL
                 string? imageUrl = null;
                 if (spotifyPlaylist.TryGetProperty("images", out var images) && images.GetArrayLength() > 0)
@@ -95,10 +104,14 @@ public class PlaylistSyncService : IPlaylistSyncService
                 var existingPlaylist = await _context.Playlists
                     .FirstOrDefaultAsync(p => p.SpotifyId == spotifyId);
 
+                Playlist playlist;
+                bool isNew = false;
+
                 if (existingPlaylist == null)
                 {
+                    isNew = true;
                     // Create new playlist
-                    var newPlaylist = new Playlist
+                    playlist = new Playlist
                     {
                         SpotifyId = spotifyId,
                         Name = name,
@@ -107,79 +120,50 @@ public class PlaylistSyncService : IPlaylistSyncService
                         Public = isPublic,
                         Collaborative = isCollaborative,
                         SnapshotId = snapshotId,
-                        ImageUrl = imageUrl
+                        ImageUrl = imageUrl,
+                        TrackCount = trackCount
                     };
 
                     // If the owner is this user, link the OwnerUserId
                     var user = await _context.Users.FindAsync(userId);
                     if (user != null && ownerSpotifyId == user.SpotifyId)
                     {
-                        newPlaylist.OwnerUserId = userId;
+                        playlist.OwnerUserId = userId;
                     }
 
                     try
                     {
-                        _context.Playlists.Add(newPlaylist);
+                        _context.Playlists.Add(playlist);
                         await _context.SaveChangesAsync();
+                        result.PlaylistsAdded++;
+                        _logger.LogDebug("[PlaylistSync] Added new playlist: {PlaylistName} ({SpotifyId})", name, spotifyId);
                     }
                     catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("UNIQUE constraint failed") == true)
                     {
                         // Another process inserted this playlist, fetch it
-                        _context.Entry(newPlaylist).State = EntityState.Detached;
-                        existingPlaylist = await _context.Playlists.FirstOrDefaultAsync(p => p.SpotifyId == spotifyId);
-                        if (existingPlaylist == null)
+                        _context.Entry(playlist).State = EntityState.Detached;
+                        playlist = await _context.Playlists.FirstOrDefaultAsync(p => p.SpotifyId == spotifyId);
+                        if (playlist == null)
                         {
                             _logger.LogError(ex, "[PlaylistSync] Failed to create or fetch playlist: {SpotifyId}", spotifyId);
                             continue;
                         }
+                        isNew = false;
                         _logger.LogDebug("[PlaylistSync] Playlist already exists (race condition): {SpotifyId}", spotifyId);
                     }
-
-                    // Create UserPlaylist relationship if we created a new playlist
-                    if (existingPlaylist == null)
-                    {
-                        // Check if user-playlist relationship already exists
-                        var existingUserPlaylist = await _context.UserPlaylists
-                            .FirstOrDefaultAsync(up => up.UserId == userId && up.PlaylistId == newPlaylist.Id);
-                        
-                        if (existingUserPlaylist == null)
-                        {
-                            try
-                            {
-                                var userPlaylist = new UserPlaylist
-                                {
-                                    UserId = userId,
-                                    PlaylistId = newPlaylist.Id,
-                                    Relation = ownerSpotifyId == user?.SpotifyId 
-                                        ? UserPlaylistRelation.Owner 
-                                        : UserPlaylistRelation.Subscriber,
-                                    FollowedAt = DateTime.UtcNow
-                                };
-                                _context.UserPlaylists.Add(userPlaylist);
-                                await _context.SaveChangesAsync();
-                            }
-                            catch (DbUpdateException)
-                            {
-                                // UserPlaylist relationship already exists, ignore
-                                _context.ChangeTracker.Clear();
-                            }
-                        }
-                        
-                        result.PlaylistsAdded++;
-                        _logger.LogDebug("[PlaylistSync] Added new playlist: {PlaylistName} ({SpotifyId})", name, spotifyId);
-                        continue;
-                    }
                 }
-                
-                // Update existing playlist if snapshot changed
-                if (existingPlaylist.SnapshotId != snapshotId)
+                else
                 {
-                    existingPlaylist.Name = name;
-                    existingPlaylist.Description = description;
-                    existingPlaylist.Public = isPublic;
-                    existingPlaylist.Collaborative = isCollaborative;
-                    existingPlaylist.SnapshotId = snapshotId;
-                    existingPlaylist.ImageUrl = imageUrl;
+                    playlist = existingPlaylist;
+                    
+                    // Always update all playlist fields
+                    playlist.Name = name;
+                    playlist.Description = description;
+                    playlist.Public = isPublic;
+                    playlist.Collaborative = isCollaborative;
+                    playlist.SnapshotId = snapshotId;
+                    playlist.ImageUrl = imageUrl;
+                    playlist.TrackCount = trackCount;
                     result.PlaylistsUpdated++;
                     _logger.LogDebug("[PlaylistSync] Updated playlist: {PlaylistName} ({SpotifyId})", name, spotifyId);
                 }
@@ -192,7 +176,7 @@ public class PlaylistSyncService : IPlaylistSyncService
                     
                     // Double-check in database to avoid race condition
                     var existingRelation = await _context.UserPlaylists
-                        .FirstOrDefaultAsync(up => up.UserId == userId && up.PlaylistId == existingPlaylist.Id);
+                        .FirstOrDefaultAsync(up => up.UserId == userId && up.PlaylistId == playlist.Id);
                     
                     if (existingRelation == null)
                     {
@@ -201,7 +185,7 @@ public class PlaylistSyncService : IPlaylistSyncService
                             var userPlaylist = new UserPlaylist
                             {
                                 UserId = userId,
-                                PlaylistId = existingPlaylist.Id,
+                                PlaylistId = playlist.Id,
                                 Relation = ownerSpotifyId == user?.SpotifyId 
                                     ? UserPlaylistRelation.Owner 
                                     : UserPlaylistRelation.Subscriber,
@@ -209,7 +193,6 @@ public class PlaylistSyncService : IPlaylistSyncService
                             };
                             _context.UserPlaylists.Add(userPlaylist);
                             await _context.SaveChangesAsync();
-                            result.PlaylistsAdded++;
                         }
                         catch (DbUpdateException)
                         {
@@ -218,6 +201,10 @@ public class PlaylistSyncService : IPlaylistSyncService
                         }
                     }
                 }
+
+                // Sync tracks for this playlist
+                var tracksAdded = await SyncPlaylistTracksAsync(playlist.Id, spotifyId, accessToken);
+                result.TracksAdded += tracksAdded;
             }
 
             // Remove playlists that user no longer follows on Spotify
@@ -242,14 +229,13 @@ public class PlaylistSyncService : IPlaylistSyncService
                 _context.SpotifySyncStates.Add(syncState);
             }
 
-            // Use a timestamp to track when playlists were last synced
             syncState.LastFullSyncAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
 
             _logger.LogInformation(
-                "[PlaylistSync] Sync complete for user {UserId}: Added={Added}, Updated={Updated}, Removed={Removed}",
-                userId, result.PlaylistsAdded, result.PlaylistsUpdated, result.PlaylistsRemoved);
+                "[PlaylistSync] Sync complete for user {UserId}: Added={Added}, Updated={Updated}, Removed={Removed}, Tracks={Tracks}",
+                userId, result.PlaylistsAdded, result.PlaylistsUpdated, result.PlaylistsRemoved, result.TracksAdded);
 
             return result;
         }
@@ -258,6 +244,137 @@ public class PlaylistSyncService : IPlaylistSyncService
             _logger.LogError(ex, "[PlaylistSync] Error syncing playlists for user {UserId}", userId);
             throw;
         }
+    }
+
+    private async Task<int> SyncPlaylistTracksAsync(int playlistId, string spotifyPlaylistId, string accessToken)
+    {
+        var tracksAdded = 0;
+        
+        try
+        {
+            // Fetch all tracks for this playlist from Spotify
+            var spotifyTracks = await FetchPlaylistTracksFromSpotifyAsync(spotifyPlaylistId, accessToken);
+            
+            _logger.LogDebug("[PlaylistSync] Fetched {Count} tracks for playlist {PlaylistId}", 
+                spotifyTracks.Count, spotifyPlaylistId);
+
+            // Clear existing playlist tracks
+            var existingPlaylistTracks = await _context.PlaylistTracks
+                .Where(pt => pt.PlaylistId == playlistId)
+                .ToListAsync();
+            
+            _context.PlaylistTracks.RemoveRange(existingPlaylistTracks);
+            await _context.SaveChangesAsync();
+
+            // Add new tracks
+            int position = 0;
+            foreach (var trackItem in spotifyTracks)
+            {
+                if (!trackItem.TryGetProperty("track", out var trackElement) || 
+                    trackElement.ValueKind == JsonValueKind.Null)
+                {
+                    position++;
+                    continue;
+                }
+
+                var spotifyId = trackElement.TryGetProperty("id", out var idProp) 
+                    ? idProp.GetString() 
+                    : null;
+
+                if (string.IsNullOrEmpty(spotifyId))
+                {
+                    position++;
+                    continue;
+                }
+
+                // Get or create the track
+                var track = await GetOrCreateTrackAsync(trackElement);
+                if (track == null)
+                {
+                    position++;
+                    continue;
+                }
+
+                // Get added_at and added_by info
+                var addedAt = trackItem.TryGetProperty("added_at", out var addedAtProp) && 
+                              !string.IsNullOrEmpty(addedAtProp.GetString())
+                    ? DateTime.Parse(addedAtProp.GetString()!)
+                    : (DateTime?)null;
+
+                string? addedBySpotifyId = null;
+                if (trackItem.TryGetProperty("added_by", out var addedBy) && 
+                    addedBy.TryGetProperty("id", out var addedByIdProp))
+                {
+                    addedBySpotifyId = addedByIdProp.GetString();
+                }
+
+                // Create PlaylistTrack entry
+                var playlistTrack = new PlaylistTrack
+                {
+                    PlaylistId = playlistId,
+                    TrackId = track.Id,
+                    Position = position,
+                    AddedAt = addedAt,
+                    AddedBySpotifyId = addedBySpotifyId
+                };
+
+                _context.PlaylistTracks.Add(playlistTrack);
+                tracksAdded++;
+                position++;
+            }
+
+            await _context.SaveChangesAsync();
+            
+            _logger.LogDebug("[PlaylistSync] Synced {Count} tracks for playlist {PlaylistId}", 
+                tracksAdded, spotifyPlaylistId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[PlaylistSync] Error syncing tracks for playlist {PlaylistId}", spotifyPlaylistId);
+        }
+
+        return tracksAdded;
+    }
+
+    private async Task<List<JsonElement>> FetchPlaylistTracksFromSpotifyAsync(string playlistId, string accessToken)
+    {
+        var allTracks = new List<JsonElement>();
+        var client = _httpClientFactory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var offset = 0;
+        const int limit = 100;
+        bool hasMore = true;
+
+        while (hasMore)
+        {
+            var url = $"https://api.spotify.com/v1/playlists/{playlistId}/tracks?limit={limit}&offset={offset}";
+            var response = await client.GetAsync(url);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                _logger.LogError("[PlaylistSync] Spotify API error fetching playlist tracks: {Error}", error);
+                break;
+            }
+
+            var content = await response.Content.ReadAsStringAsync();
+            var data = JsonSerializer.Deserialize<JsonElement>(content);
+
+            if (data.TryGetProperty("items", out var items))
+            {
+                foreach (var item in items.EnumerateArray())
+                {
+                    allTracks.Add(item);
+                }
+            }
+
+            var total = data.TryGetProperty("total", out var totalProp) ? totalProp.GetInt32() : 0;
+            offset += limit;
+            hasMore = offset < total;
+        }
+
+        return allTracks;
     }
 
     private async Task<List<JsonElement>> FetchAllPlaylistsFromSpotifyAsync(string accessToken)
@@ -297,5 +414,249 @@ public class PlaylistSyncService : IPlaylistSyncService
         }
 
         return allPlaylists;
+    }
+
+    private async Task<Track?> GetOrCreateTrackAsync(JsonElement trackElement)
+    {
+        var spotifyId = trackElement.TryGetProperty("id", out var idProp) 
+            ? idProp.GetString() 
+            : null;
+
+        if (string.IsNullOrEmpty(spotifyId))
+        {
+            return null;
+        }
+
+        // Check if track already exists
+        var existingTrack = await _context.Tracks
+            .FirstOrDefaultAsync(t => t.SpotifyId == spotifyId);
+
+        if (existingTrack != null)
+        {
+            return existingTrack;
+        }
+
+        // Process album first
+        int? albumId = null;
+        if (trackElement.TryGetProperty("album", out var albumEl) && 
+            albumEl.ValueKind != JsonValueKind.Null)
+        {
+            var album = await GetOrCreateAlbumAsync(albumEl);
+            albumId = album?.Id;
+        }
+
+        // Create new track
+        var track = new Track
+        {
+            SpotifyId = spotifyId,
+            Name = trackElement.TryGetProperty("name", out var nameProp) 
+                ? nameProp.GetString() ?? "Unknown" 
+                : "Unknown",
+            DurationMs = trackElement.TryGetProperty("duration_ms", out var durationProp) 
+                ? durationProp.GetInt32() 
+                : 0,
+            Explicit = trackElement.TryGetProperty("explicit", out var explicitProp) 
+                && explicitProp.GetBoolean(),
+            Popularity = trackElement.TryGetProperty("popularity", out var popularityProp) 
+                ? popularityProp.GetInt32() 
+                : null,
+            Isrc = trackElement.TryGetProperty("external_ids", out var externalIds) &&
+                   externalIds.TryGetProperty("isrc", out var isrcProp)
+                ? isrcProp.GetString()
+                : null,
+            AlbumId = albumId
+        };
+
+        try
+        {
+            _context.Tracks.Add(track);
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("UNIQUE constraint failed") == true)
+        {
+            _context.Entry(track).State = EntityState.Detached;
+            var fetchedTrack = await _context.Tracks.FirstOrDefaultAsync(t => t.SpotifyId == spotifyId);
+            if (fetchedTrack != null)
+            {
+                return fetchedTrack;
+            }
+            _logger.LogError(ex, "[PlaylistSync] Failed to create or fetch track: {SpotifyId}", spotifyId);
+            return null;
+        }
+
+        // Process artists
+        if (trackElement.TryGetProperty("artists", out var artistsElement) && 
+            artistsElement.ValueKind == JsonValueKind.Array)
+        {
+            int order = 0;
+            foreach (var artistElement in artistsElement.EnumerateArray())
+            {
+                var artist = await GetOrCreateArtistAsync(artistElement);
+                if (artist != null)
+                {
+                    var existingTrackArtist = await _context.TrackArtists
+                        .FirstOrDefaultAsync(ta => ta.TrackId == track.Id && ta.ArtistId == artist.Id);
+
+                    if (existingTrackArtist == null)
+                    {
+                        try
+                        {
+                            _context.TrackArtists.Add(new TrackArtist
+                            {
+                                TrackId = track.Id,
+                                ArtistId = artist.Id,
+                                ArtistOrder = order
+                            });
+                            await _context.SaveChangesAsync();
+                        }
+                        catch (DbUpdateException)
+                        {
+                            _context.ChangeTracker.Clear();
+                        }
+                    }
+                    order++;
+                }
+            }
+        }
+
+        return track;
+    }
+
+    private async Task<Album?> GetOrCreateAlbumAsync(JsonElement albumElement)
+    {
+        var spotifyId = albumElement.TryGetProperty("id", out var idProp) 
+            ? idProp.GetString() 
+            : null;
+
+        if (string.IsNullOrEmpty(spotifyId))
+        {
+            return null;
+        }
+
+        var existingAlbum = await _context.Albums
+            .FirstOrDefaultAsync(a => a.SpotifyId == spotifyId);
+
+        if (existingAlbum != null)
+        {
+            return existingAlbum;
+        }
+
+        string? imageUrl = null;
+        if (albumElement.TryGetProperty("images", out var imagesElement) && 
+            imagesElement.ValueKind == JsonValueKind.Array && 
+            imagesElement.GetArrayLength() > 0)
+        {
+            imageUrl = imagesElement[0].TryGetProperty("url", out var urlProp) 
+                ? urlProp.GetString() 
+                : null;
+        }
+
+        DateTime? releaseDate = null;
+        if (albumElement.TryGetProperty("release_date", out var releaseDateProp))
+        {
+            var releaseDateStr = releaseDateProp.GetString();
+            if (!string.IsNullOrEmpty(releaseDateStr))
+            {
+                if (DateTime.TryParse(releaseDateStr, out var parsedDate))
+                {
+                    releaseDate = parsedDate;
+                }
+                else if (releaseDateStr.Length == 4 && int.TryParse(releaseDateStr, out var year))
+                {
+                    releaseDate = new DateTime(year, 1, 1);
+                }
+            }
+        }
+
+        var album = new Album
+        {
+            SpotifyId = spotifyId,
+            Name = albumElement.TryGetProperty("name", out var nameProp) 
+                ? nameProp.GetString() ?? "Unknown" 
+                : "Unknown",
+            ReleaseDate = releaseDate,
+            AlbumType = albumElement.TryGetProperty("album_type", out var typeProp) 
+                ? typeProp.GetString() 
+                : null,
+            ImageUrl = imageUrl
+        };
+
+        try
+        {
+            _context.Albums.Add(album);
+            await _context.SaveChangesAsync();
+            return album;
+        }
+        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("UNIQUE constraint failed") == true)
+        {
+            _context.Entry(album).State = EntityState.Detached;
+            var fetchedAlbum = await _context.Albums.FirstOrDefaultAsync(a => a.SpotifyId == spotifyId);
+            if (fetchedAlbum != null)
+            {
+                return fetchedAlbum;
+            }
+            _logger.LogError(ex, "[PlaylistSync] Failed to create or fetch album: {SpotifyId}", spotifyId);
+            return null;
+        }
+    }
+
+    private async Task<Artist?> GetOrCreateArtistAsync(JsonElement artistElement)
+    {
+        var spotifyId = artistElement.TryGetProperty("id", out var idProp) 
+            ? idProp.GetString() 
+            : null;
+
+        if (string.IsNullOrEmpty(spotifyId))
+        {
+            return null;
+        }
+
+        var existingArtist = await _context.Artists
+            .FirstOrDefaultAsync(a => a.SpotifyId == spotifyId);
+
+        if (existingArtist != null)
+        {
+            return existingArtist;
+        }
+
+        string? imageUrl = null;
+        if (artistElement.TryGetProperty("images", out var imagesElement) && 
+            imagesElement.ValueKind == JsonValueKind.Array && 
+            imagesElement.GetArrayLength() > 0)
+        {
+            imageUrl = imagesElement[0].TryGetProperty("url", out var urlProp) 
+                ? urlProp.GetString() 
+                : null;
+        }
+
+        var artist = new Artist
+        {
+            SpotifyId = spotifyId,
+            Name = artistElement.TryGetProperty("name", out var nameProp) 
+                ? nameProp.GetString() ?? "Unknown" 
+                : "Unknown",
+            ImageUrl = imageUrl,
+            Popularity = artistElement.TryGetProperty("popularity", out var popularityProp) 
+                ? popularityProp.GetInt32() 
+                : null
+        };
+
+        try
+        {
+            _context.Artists.Add(artist);
+            await _context.SaveChangesAsync();
+            return artist;
+        }
+        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("UNIQUE constraint failed") == true)
+        {
+            _context.Entry(artist).State = EntityState.Detached;
+            var fetchedArtist = await _context.Artists.FirstOrDefaultAsync(a => a.SpotifyId == spotifyId);
+            if (fetchedArtist != null)
+            {
+                return fetchedArtist;
+            }
+            _logger.LogError(ex, "[PlaylistSync] Failed to create or fetch artist: {SpotifyId}", spotifyId);
+            return null;
+        }
     }
 }

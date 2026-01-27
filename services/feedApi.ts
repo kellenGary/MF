@@ -106,7 +106,7 @@ class FeedApiService {
   async getFeed(
     limit: number = 20,
     offset: number = 0,
-    type?: PostType
+    type?: PostType,
   ): Promise<FeedResponse> {
     const params = new URLSearchParams();
     params.append("limit", limit.toString());
@@ -116,7 +116,7 @@ class FeedApiService {
     }
 
     const response = await api.makeAuthenticatedRequest(
-      `/api/feed?${params.toString()}`
+      `/api/feed?${params.toString()}`,
     );
 
     if (!response.ok) {
@@ -138,7 +138,7 @@ class FeedApiService {
     userId: number,
     limit: number = 20,
     offset: number = 0,
-    type?: PostType
+    type?: PostType,
   ): Promise<FeedResponse> {
     const params = new URLSearchParams();
     params.append("limit", limit.toString());
@@ -148,7 +148,7 @@ class FeedApiService {
     }
 
     const response = await api.makeAuthenticatedRequest(
-      `/api/feed/user/${userId}?${params.toString()}`
+      `/api/feed/user/${userId}?${params.toString()}`,
     );
 
     if (!response.ok) {
@@ -209,11 +209,30 @@ class FeedApiService {
    * Parse the listening session metadata from a post
    */
   parseListeningSessionMetadata(
-    post: FeedPost
+    post: FeedPost,
   ): ListeningSessionMetadata | null {
     if (post.type !== "ListeningSession" || !post.metadataJson) return null;
     try {
-      return JSON.parse(post.metadataJson) as ListeningSessionMetadata;
+      const parsed = JSON.parse(post.metadataJson);
+      if (!parsed) return null;
+
+      // Handle PascalCase keys from backend
+      const rawTracks = parsed.Tracks || parsed.tracks || [];
+      const tracks: ListeningSessionTrack[] = rawTracks.map((t: any) => ({
+        trackId: t.TrackId ?? t.trackId,
+        spotifyId: t.SpotifyId ?? t.spotifyId ?? null,
+        name: t.Name ?? t.name ?? null,
+        artistNames: t.ArtistNames ?? t.artistNames ?? null,
+        albumImageUrl: t.AlbumImageUrl ?? t.albumImageUrl ?? null,
+        durationMs: t.DurationMs ?? t.durationMs ?? 0,
+        playedAt: t.PlayedAt ?? t.playedAt ?? "",
+      }));
+
+      return {
+        tracks,
+        totalDurationMs: parsed.TotalDurationMs ?? parsed.totalDurationMs ?? 0,
+        trackCount: parsed.TrackCount ?? parsed.trackCount ?? tracks.length,
+      };
     } catch {
       return null;
     }
@@ -312,14 +331,14 @@ class FeedApiService {
     trackId?: number,
     spotifyId?: string,
     caption?: string,
-    visibility: PostVisibility = "Public"
+    visibility: PostVisibility = "Public",
   ): Promise<{ message: string; postId: number }> {
     const response = await api.makeAuthenticatedRequest(
       "/api/post/share/track",
       {
         method: "POST",
         body: JSON.stringify({ trackId, spotifyId, caption, visibility }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -337,14 +356,14 @@ class FeedApiService {
     albumId?: number,
     spotifyId?: string,
     caption?: string,
-    visibility: PostVisibility = "Public"
+    visibility: PostVisibility = "Public",
   ): Promise<{ message: string; postId: number }> {
     const response = await api.makeAuthenticatedRequest(
       "/api/post/share/album",
       {
         method: "POST",
         body: JSON.stringify({ albumId, spotifyId, caption, visibility }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -362,14 +381,14 @@ class FeedApiService {
     playlistId?: number,
     spotifyId?: string,
     caption?: string,
-    visibility: PostVisibility = "Public"
+    visibility: PostVisibility = "Public",
   ): Promise<{ message: string; postId: number }> {
     const response = await api.makeAuthenticatedRequest(
       "/api/post/share/playlist",
       {
         method: "POST",
         body: JSON.stringify({ playlistId, spotifyId, caption, visibility }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -387,14 +406,14 @@ class FeedApiService {
     artistId?: number,
     spotifyId?: string,
     caption?: string,
-    visibility: PostVisibility = "Public"
+    visibility: PostVisibility = "Public",
   ): Promise<{ message: string; postId: number }> {
     const response = await api.makeAuthenticatedRequest(
       "/api/post/share/artist",
       {
         method: "POST",
         body: JSON.stringify({ artistId, spotifyId, caption, visibility }),
-      }
+      },
     );
 
     if (!response.ok) {

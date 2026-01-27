@@ -60,14 +60,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function syncSpotifyData() {
     try {
       console.log("[AuthContext] Syncing Spotify data...");
-      
+
       // Sync playlists
       const playlistResult = await spotifyApi.syncPlaylists();
       console.log("[AuthContext] Playlist sync complete:", playlistResult);
-      
+
       // Sync saved/liked tracks
       const savedTracksResult = await spotifyApi.syncSavedTracks();
-      console.log("[AuthContext] Saved tracks sync complete:", savedTracksResult);
+      console.log(
+        "[AuthContext] Saved tracks sync complete:",
+        savedTracksResult,
+      );
     } catch (error) {
       // Don't fail the app if sync fails, just log it
       console.error("[AuthContext] Failed to sync Spotify data:", error);
@@ -93,6 +96,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signIn(token: string, userData: User) {
     try {
+      // Reset sync flag so playlists sync on every login
+      hasSyncedPlaylists.current = false;
+
       await SecureStore.setItemAsync("jwt_token", token);
       await SecureStore.setItemAsync("user", JSON.stringify(userData));
       setJwtToken(token);

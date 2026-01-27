@@ -1,25 +1,28 @@
-import AlbumCard from "@/components/album-card";
-import PlaylistCard from "@/components/playlist-card";
-import SectionHeader from "@/components/section-header";
-import SongCard from "@/components/song-card";
 import UserCard from "@/components/user-card";
-import { Colors } from "@/constants/theme";
+import { Colors, Fonts } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import dbApi from "@/services/dbApi";
 import followApi from "@/services/followApi";
-import { useCallback, useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function ExploreScreen() {
   const [users, setUsers] = useState<any[]>([]);
   const [followStatus, setFollowStatus] = useState<Record<number, boolean>>({});
   const [loadingFollows, setLoadingFollows] = useState<Record<number, boolean>>(
-    {}
+    {},
   );
-  const [trendingSongs, setTrendingSongs] = useState<any[]>([]);
-  const [trendingAlbums, setTrendingAlbums] = useState<any[]>([]);
-  const [trendingPlaylists, setTrendingPlaylists] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
@@ -29,8 +32,9 @@ export default function ExploreScreen() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setLoading(true);
         const usersData = await dbApi.getAllUsers();
-        const usersList = usersData?.slice(0, 5) || [];
+        const usersList = usersData || [];
         setUsers(usersList);
 
         // Fetch follow status for all users
@@ -39,21 +43,29 @@ export default function ExploreScreen() {
           const statuses = await followApi.getFollowStatusBatch(userIds);
           setFollowStatus(statuses);
         }
-
-        // TODO: Add API endpoints for trending data
-        // const songs = await dbApi.getTrendingSongs();
-        // const albums = await dbApi.getTrendingAlbums();
-        // const playlists = await dbApi.getTrendingPlaylists();
       } catch (error) {
-        console.error("Error fetching explore data:", error);
+        console.error("Error fetching users:", error);
+      } finally {
+        setLoading(false);
       }
     };
     fetchData();
   }, []);
 
+  // Filter users based on search query
+  const filteredUsers = useMemo(() => {
+    if (!searchQuery.trim()) return users;
+
+    const query = searchQuery.toLowerCase();
+    return users.filter(
+      (user) =>
+        user.displayName?.toLowerCase().includes(query) ||
+        user.handle?.toLowerCase().includes(query),
+    );
+  }, [users, searchQuery]);
+
   const handleToggleFollow = useCallback(
     async (userId: number) => {
-      // Prevent multiple simultaneous requests for the same user
       if (loadingFollows[userId]) return;
 
       setLoadingFollows((prev) => ({ ...prev, [userId]: true }));
@@ -68,7 +80,7 @@ export default function ExploreScreen() {
         setLoadingFollows((prev) => ({ ...prev, [userId]: false }));
       }
     },
-    [followStatus, loadingFollows]
+    [followStatus, loadingFollows],
   );
 
   return (
@@ -79,133 +91,146 @@ export default function ExploreScreen() {
         { backgroundColor: colors.background },
       ]}
     >
-      <ScrollView
-        style={[styles.scrollContainer]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            Explore
-          </Text>
-          <Text
-            style={[styles.headerSubtitle, { color: colors.tabIconDefault }]}
-          >
-            Discover new music and creators
-          </Text>
-        </View>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          Find People
+        </Text>
+      </View>
 
-        {/* Recommended Accounts Section */}
-        <View style={styles.section}>
-          <SectionHeader title="Recommended Accounts" />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.horizontalScroll}
-          >
-            {users.map((user) => (
-              <View key={user.id} style={styles.userCardWrapper}>
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <View
+          style={[
+            styles.searchBar,
+            {
+              backgroundColor: isDark
+                ? "rgba(255,255,255,0.1)"
+                : "rgba(0,0,0,0.05)",
+            },
+          ]}
+        >
+          <MaterialIcons
+            name="search"
+            size={22}
+            color={colors.tabIconDefault}
+          />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Search by name or username..."
+            placeholderTextColor={colors.tabIconDefault}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {searchQuery.length > 0 && (
+            <MaterialIcons
+              name="close"
+              size={20}
+              color={colors.tabIconDefault}
+              onPress={() => setSearchQuery("")}
+            />
+          )}
+        </View>
+      </View>
+
+      {/* User List */}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.tint} />
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.scrollContainer}
+          contentContainerStyle={styles.userList}
+          showsVerticalScrollIndicator={false}
+        >
+          {filteredUsers.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <MaterialIcons
+                name="person-search"
+                size={48}
+                color={colors.tabIconDefault}
+              />
+              <Text
+                style={[styles.emptyText, { color: colors.tabIconDefault }]}
+              >
+                {searchQuery ? "No users found" : "No users to display"}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.userGrid}>
+              {filteredUsers.map((user) => (
                 <UserCard
+                  key={user.id}
                   user={user}
                   isFollowing={followStatus[user.id] || false}
                   isLoading={loadingFollows[user.id] || false}
                   onToggleFollow={handleToggleFollow}
                 />
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Trending Songs Section */}
-        <View style={styles.section}>
-          <SectionHeader title="Trending Songs" />
-          <View>
-            {[1, 2, 3].map((index) => (
-              <SongCard
-                key={index}
-                song={{
-                  title: `Trending Song ${index}`,
-                  artist: "Artist Name",
-                }}
-              />
-            ))}
-          </View>
-        </View>
-
-        {/* Trending Albums Section */}
-        <View style={styles.section}>
-          <SectionHeader title="Trending Albums" />
-          <View style={styles.gridContainer}>
-            {[1, 2, 3, 4].map((index) => (
-              <View key={index} style={styles.gridItem}>
-                <AlbumCard
-                  album={{ title: `Album ${index}`, artist: "Artist Name" }}
-                />
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* Trending Playlists Section */}
-        <View style={styles.section}>
-          <SectionHeader title="Trending Playlists" />
-          <View style={styles.gridContainer}>
-            {[1, 2, 3, 4].map((index) => (
-              <View key={index} style={styles.gridItem}>
-                <PlaylistCard
-                  playlist={{
-                    name: `Playlist ${index}`,
-                    trackCount: Math.floor(Math.random() * 50) + 10,
-                  }}
-                />
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.spacer} />
-      </ScrollView>
+              ))}
+            </View>
+          )}
+          <View style={styles.spacer} />
+        </ScrollView>
+      )}
     </View>
   );
-}
+}3
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContainer: {
-    flex: 1,
-  },
   header: {
     paddingHorizontal: 16,
-    paddingBottom: 24,
+    paddingBottom: 16,
   },
   headerTitle: {
     fontSize: 32,
     fontWeight: "800",
-    marginBottom: 4,
   },
-  headerSubtitle: {
-    fontSize: 14,
-  },
-  section: {
-    marginBottom: 32,
+  searchContainer: {
     paddingHorizontal: 16,
+    paddingBottom: 16,
   },
-  horizontalScroll: {
-    marginHorizontal: -16,
-    paddingHorizontal: 16,
-  },
-  userCardWrapper: {
-    marginRight: 12,
-  },
-  gridContainer: {
+  searchBar: {
     flexDirection: "row",
-    flexWrap: "wrap",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    padding: 0,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  scrollContainer: {
+    flex: 1,
+  },
+  userList: {
+    paddingHorizontal: 16,
+  },
+  userGrid: {
+    gap: 0,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 60,
     gap: 12,
   },
-  gridItem: {
-    width: "48%",
+  emptyText: {
+    fontSize: 16,
   },
   spacer: {
     height: 100,

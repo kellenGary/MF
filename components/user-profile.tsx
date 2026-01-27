@@ -58,11 +58,13 @@ export default function UserProfile({ userId }: { userId?: number }) {
   const scrollViewRef = useRef<ScrollView>(null);
 
   const {
+    topArtists,
     recentTracks,
     likedTracks,
     playlists,
     loading: contentLoading,
     pagination,
+    fetchTopArtists,
     fetchRecentTracks,
     fetchLikedTracks,
     fetchPlaylists,
@@ -118,6 +120,7 @@ export default function UserProfile({ userId }: { userId?: number }) {
         currentAlbumGroup = {
           type: "album-group",
           albumId: albumId || null,
+          albumSpotifyId: album?.spotifyId || album?.spotify_id || null,
           albumName: album?.name || "Unknown Album",
           albumCover: album?.image_url || album?.images?.[0]?.url || "",
           artists: track.artists || [],
@@ -205,7 +208,7 @@ export default function UserProfile({ userId }: { userId?: number }) {
               ?.filter((playlist: any) =>
                 isOwnProfile
                   ? playlist.owner.id === profileData?.spotifyId
-                  : true
+                  : true,
               )
               .map((playlist: any) => (
                 <PlaylistItem
@@ -270,7 +273,8 @@ export default function UserProfile({ userId }: { userId?: number }) {
       fetchRecentTracks(PAGE_SIZE, 0, true).catch(() => {});
       fetchLikedTracks(PAGE_SIZE, 0, true).catch(() => {});
       fetchPlaylists(true).catch(() => {});
-    }, [isAuthenticated, userId])
+      fetchTopArtists(true).catch(() => {});
+    }, [isAuthenticated, userId]),
   );
 
   // playlists are loaded via the useUserContent hook; wrapper kept for compatibility
@@ -286,7 +290,7 @@ export default function UserProfile({ userId }: { userId?: number }) {
         setLoading(false);
       }
     },
-    [isAuthenticated, fetchPlaylists]
+    [isAuthenticated, fetchPlaylists],
   );
 
   // liked tracks are managed by the useUserContent hook
@@ -348,7 +352,7 @@ export default function UserProfile({ userId }: { userId?: number }) {
         loadMore();
       }
     },
-    [loadMore]
+    [loadMore],
   );
 
   // Reset data when userId changes (navigating to different profile)
@@ -364,6 +368,7 @@ export default function UserProfile({ userId }: { userId?: number }) {
     fetchRecentTracks(PAGE_SIZE, 0, true).catch(() => {});
     fetchLikedTracks(PAGE_SIZE, 0, true).catch(() => {});
     fetchPlaylists(true).catch(() => {});
+    fetchTopArtists(true).catch(() => {});
   }, [userId]);
 
   // Initial data load when tab changes (only if data not already loaded)
@@ -435,13 +440,16 @@ export default function UserProfile({ userId }: { userId?: number }) {
             {isOwnProfile ? (
               <>
                 <Pressable
-                  style={styles.mapButton}
+                  style={[styles.mapButton, { backgroundColor: colors.card }]}
                   onPress={() => router.push("/listening-map")}
                 >
                   <MaterialIcons name="map" size={24} color={colors.icon} />
                 </Pressable>
                 <Pressable
-                  style={styles.settingsButton}
+                  style={[
+                    styles.settingsButton,
+                    { backgroundColor: colors.card },
+                  ]}
                   onPress={() => router.push("/(settings)")}
                 >
                   <MaterialIcons
@@ -470,7 +478,7 @@ export default function UserProfile({ userId }: { userId?: number }) {
               {profileData ? profileData.displayName : "Unknown"}
             </Text>
             <Text style={{ color: colors.text }}>
-              {profileData ? profileData.handle : "unknown"}
+              {profileData ? "@" + profileData.handle : "unknown"}
             </Text>
 
             {/* Follow Button for other users' profiles */}
@@ -522,6 +530,37 @@ export default function UserProfile({ userId }: { userId?: number }) {
               </Text>
             </Pressable>
           </View>
+
+          {/* Top Artists Section */}
+          {topArtists && topArtists.length > 0 && (
+            <View style={styles.topArtistsContainer}>
+              <Text style={[styles.topArtistsLabel, { color: colors.text }]}>
+                Top Artists
+              </Text>
+              <View style={styles.topArtistsRow}>
+                {topArtists.slice(0, 3).map((artist: any, index: number) => (
+                  <Pressable
+                    key={artist.id || index}
+                    style={styles.topArtistItem}
+                    onPress={() =>
+                      router.push(`/artist/${artist.id}` as RelativePathString)
+                    }
+                  >
+                    <Image
+                      source={{ uri: artist.images?.[0]?.url || "" }}
+                      style={styles.topArtistImage}
+                    />
+                    <Text
+                      style={[styles.topArtistName, { color: colors.text }]}
+                      numberOfLines={1}
+                    >
+                      {artist.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          )}
         </View>
 
         {/* Tab Navigation */}
@@ -671,5 +710,38 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     opacity: 0.5,
     fontSize: 14,
+  },
+  topArtistsContainer: {
+    paddingHorizontal: 20,
+    alignItems: "center",
+  },
+  topArtistsLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    fontFamily: Fonts.rounded,
+    marginBottom: 12,
+    opacity: 0.7,
+  },
+  topArtistsRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 20,
+  },
+  topArtistItem: {
+    alignItems: "center",
+    width: 70,
+  },
+  topArtistImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.3)",
+  },
+  topArtistName: {
+    fontSize: 11,
+    marginTop: 6,
+    textAlign: "center",
+    fontFamily: Fonts.rounded,
   },
 });

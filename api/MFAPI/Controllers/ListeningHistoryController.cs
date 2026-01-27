@@ -452,6 +452,93 @@ public class ListeningHistoryController : ControllerBase
     }
 
     /// <summary>
+    /// Gets listening history entries with location data from ALL users for the global map.
+    /// Returns entries with valid latitude and longitude coordinates.
+    /// </summary>
+    [HttpGet("all-with-location")]
+    public async Task<IActionResult> GetAllListeningHistoryWithLocation(
+        [FromQuery] int limit = 500,
+        [FromQuery] int offset = 0)
+    {
+        try
+        {
+            // Verify the requesting user is authenticated
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null)
+            {
+                return Unauthorized(new { error = "Invalid token" });
+            }
+
+            if (limit < 1 || limit > 1000) limit = 500;
+            if (offset < 0) offset = 0;
+
+            var query = _context.ListeningHistory
+                .Where(h => h.Latitude.HasValue && h.Longitude.HasValue)
+                .Include(h => h.User)
+                .Include(h => h.Track)
+                    .ThenInclude(t => t.Album)
+                .Include(h => h.Track)
+                    .ThenInclude(t => t.TrackArtists)
+                        .ThenInclude(ta => ta.Artist)
+                .OrderByDescending(h => h.PlayedAt);
+
+            var total = await query.CountAsync();
+            var items = await query
+                .Skip(offset)
+                .Take(limit)
+                .ToListAsync();
+
+            var locationItems = items.Select(h => new
+            {
+                id = h.Id,
+                played_at = h.PlayedAt,
+                latitude = h.Latitude,
+                longitude = h.Longitude,
+                location_accuracy = h.LocationAccuracy,
+                user = new
+                {
+                    id = h.User.Id,
+                    display_name = h.User.DisplayName,
+                    avatar_url = h.User.ProfileImageUrl
+                },
+                track = new
+                {
+                    id = h.Track.Id,
+                    spotify_id = h.Track.SpotifyId,
+                    name = h.Track.Name,
+                    album = h.Track.Album != null ? new
+                    {
+                        id = h.Track.Album.Id,
+                        name = h.Track.Album.Name,
+                        image_url = h.Track.Album.ImageUrl
+                    } : null,
+                    artists = h.Track.TrackArtists
+                        .OrderBy(ta => ta.ArtistOrder)
+                        .Select(ta => new
+                        {
+                            id = ta.Artist.Id,
+                            name = ta.Artist.Name
+                        })
+                        .ToList()
+                }
+            }).ToList();
+
+            return Ok(new
+            {
+                total = total,
+                limit = limit,
+                offset = offset,
+                items = locationItems
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting all listening history with location");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+
+    /// <summary>
     /// Gets consecutive day streaks for all tracks played by a user.
     /// Returns only tracks with streak >= 2 to minimize payload size.
     /// </summary>

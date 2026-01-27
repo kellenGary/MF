@@ -1,4 +1,5 @@
 import listeningHistoryApi from "@/services/listeningHistoryApi";
+import profileApi from "@/services/profileApi";
 import userDataApi from "@/services/userDataApi";
 import { useCallback, useState } from "react";
 
@@ -7,6 +8,7 @@ type LoadingFlags = {
   albums: boolean;
   playlists: boolean;
   artists: boolean;
+  topArtists: boolean;
 };
 
 type PaginationState = {
@@ -14,6 +16,7 @@ type PaginationState = {
   likedTracks: { total: number; hasMore: boolean };
   likedAlbums: { total: number; hasMore: boolean };
   followedArtists: { total: number; hasMore: boolean };
+  topArtists: { total: number; hasMore: boolean };
 };
 
 export default function useUserContent(userId?: number) {
@@ -22,12 +25,14 @@ export default function useUserContent(userId?: number) {
   const [likedAlbums, setLikedAlbums] = useState<any[]>([]);
   const [playlists, setPlaylists] = useState<any[]>([]);
   const [followedArtists, setFollowedArtists] = useState<any[]>([]);
+  const [topArtists, setTopArtists] = useState<any[]>([]);
 
   const [loading, setLoading] = useState<LoadingFlags>({
     tracks: false,
     albums: false,
     playlists: false,
     artists: false,
+    topArtists: false,
   });
 
   const [pagination, setPagination] = useState<PaginationState>({
@@ -35,6 +40,7 @@ export default function useUserContent(userId?: number) {
     likedTracks: { total: 0, hasMore: true },
     likedAlbums: { total: 0, hasMore: true },
     followedArtists: { total: 0, hasMore: true },
+    topArtists: { total: 0, hasMore: true },
   });
 
   /**
@@ -60,7 +66,7 @@ export default function useUserContent(userId?: number) {
         const data = await listeningHistoryApi.getEnrichedListeningHistory(
           limit,
           offset,
-          userId
+          userId,
         );
         const newItems = data.items || [];
 
@@ -82,7 +88,7 @@ export default function useUserContent(userId?: number) {
         setLoading((s) => ({ ...s, tracks: false }));
       }
     },
-    [recentTracks.length, userId, loading.tracks, pagination.recentTracks]
+    [recentTracks.length, userId, loading.tracks, pagination.recentTracks],
   );
 
   /**
@@ -121,7 +127,7 @@ export default function useUserContent(userId?: number) {
         setLoading((s) => ({ ...s, tracks: false }));
       }
     },
-    [likedTracks.length, userId, loading.tracks, pagination.likedTracks]
+    [likedTracks.length, userId, loading.tracks, pagination.likedTracks],
   );
 
   /**
@@ -160,7 +166,7 @@ export default function useUserContent(userId?: number) {
         setLoading((s) => ({ ...s, albums: false }));
       }
     },
-    [likedAlbums.length, userId, loading.albums, pagination.likedAlbums]
+    [likedAlbums.length, userId, loading.albums, pagination.likedAlbums],
   );
 
   /**
@@ -178,7 +184,7 @@ export default function useUserContent(userId?: number) {
         setLoading((s) => ({ ...s, playlists: false }));
       }
     },
-    [playlists.length, userId]
+    [playlists.length, userId],
   );
 
   /**
@@ -208,7 +214,7 @@ export default function useUserContent(userId?: number) {
         const data = await userDataApi.getFollowedArtists(
           limit,
           offset,
-          userId
+          userId,
         );
         const newItems = data.items || [];
 
@@ -235,7 +241,7 @@ export default function useUserContent(userId?: number) {
       userId,
       loading.artists,
       pagination.followedArtists,
-    ]
+    ],
   );
 
   /**
@@ -247,12 +253,14 @@ export default function useUserContent(userId?: number) {
       likedTracks: { total: 0, hasMore: true },
       likedAlbums: { total: 0, hasMore: true },
       followedArtists: { total: 0, hasMore: true },
+      topArtists: { total: 0, hasMore: true },
     });
     setRecentTracks([]);
     setLikedTracks([]);
     setLikedAlbums([]);
     setPlaylists([]);
     setFollowedArtists([]);
+    setTopArtists([]);
   }, []);
 
   const refreshAll = useCallback(async () => {
@@ -280,13 +288,41 @@ export default function useUserContent(userId?: number) {
             .split(".")
             .reduce((obj: any, key) => obj?.[key], item);
           return value?.toString().toLowerCase().includes(q);
-        })
+        }),
       );
     },
-    []
+    [],
+  );
+
+  const fetchTopArtists = useCallback(
+    async (refresh = false) => {
+      if (!refresh && topArtists.length > 0) {
+        return { items: topArtists };
+      }
+
+      if (!refresh && loading.topArtists) {
+        return { items: topArtists };
+      }
+
+      setLoading((s) => ({ ...s, topArtists: true }));
+      try {
+        const data = await profileApi.getTopArtists(userId);
+        // Spotify API returns { topItems: { items: [...] } }
+        const items = data?.topItems?.items || [];
+        setTopArtists(items);
+        return { items };
+      } catch (error) {
+        console.error("Failed to fetch top artists:", error);
+        return { items: [] };
+      } finally {
+        setLoading((s) => ({ ...s, topArtists: false }));
+      }
+    },
+    [topArtists.length, userId, loading.topArtists],
   );
 
   return {
+    topArtists,
     recentTracks,
     likedTracks,
     likedAlbums,
@@ -294,6 +330,7 @@ export default function useUserContent(userId?: number) {
     followedArtists,
     loading,
     pagination,
+    fetchTopArtists,
     fetchRecentTracks,
     fetchLikedTracks,
     fetchLikedAlbums,
