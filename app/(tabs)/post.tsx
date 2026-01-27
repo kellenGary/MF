@@ -1,6 +1,7 @@
-import { ThemedText } from '@/components/themed-text';
 import FilterBubble from "@/components/filter-bubble";
+import SearchBar from "@/components/search-bar";
 import SelectableItem from "@/components/selectable-item";
+import { ThemedText } from '@/components/themed-text';
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -14,9 +15,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
-  View,
+  View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -334,7 +333,7 @@ export default function PostScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <ThemedText style={[styles.title, { color: colors.text }]}>Make a Post</ThemedText>
+        <ThemedText type="title">Make a Post</ThemedText>
         {/* Continue Button */}
         {selectedContent && (
           <View style={[styles.bottomBar]}>
@@ -350,6 +349,17 @@ export default function PostScreen() {
           </View>
         )}
       </View>
+      
+      {/* Search Bar */}
+      <SearchBar
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholder={`Search ${activeFilter.toLowerCase()}s...`}
+        containerStyle={{
+          marginVertical: 12,
+          marginHorizontal: 10,
+        }}
+      />
 
       {/* Filter Bubbles */}
       <View style={styles.filtersContainer}>
@@ -363,22 +373,7 @@ export default function PostScreen() {
         ))}
       </View>
 
-      {/* Search Bar */}
-      <View style={[styles.searchContainer, { backgroundColor: colors.card }]}>
-        <MaterialIcons name="search" size={20} color={colors.icon} />
-        <TextInput
-          style={[styles.searchInput, { color: colors.text }]}
-          placeholder={`Search ${activeFilter.toLowerCase()}s...`}
-          placeholderTextColor={colors.icon}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery.length > 0 && (
-          <Pressable onPress={() => setSearchQuery("")}>
-            <MaterialIcons name="close" size={20} color={colors.icon} />
-          </Pressable>
-        )}
-      </View>
+
 
       {/* Content List */}
       <ScrollView
@@ -411,20 +406,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 4,
   },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    borderRadius: 10,
-    marginVertical: 12,
-    marginHorizontal: 10,
-    gap: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-  },
+
   listContainer: {
     flex: 1,
   },
@@ -464,6 +446,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
   },
 });

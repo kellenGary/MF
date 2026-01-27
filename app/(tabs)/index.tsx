@@ -68,7 +68,7 @@ export default function HomeScreen() {
               petal.
             </ThemedText>
             <Image
-              source={require("../../assets/images/Frame 2.svg")}
+              source={!isDark ? require("../../assets/images/black-icon.svg") : require("../../assets/images/white-icon.svg")}
               style={styles.headerImage}
             />
           </View>

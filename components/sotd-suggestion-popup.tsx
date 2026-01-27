@@ -57,7 +57,7 @@ export default function SotdSuggestionPopup({
                 >
                     <View style={[styles.card, { backgroundColor: colors.card }]}>
                         <Image
-                            source={require("@/assets/images/Frame 2.svg")}
+                            source={!isDark ? require("@/assets/images/black-icon.svg") : require("@/assets/images/white-icon.svg")}
                             style={styles.icon}
                         />
 
@@ -72,7 +72,7 @@ export default function SotdSuggestionPopup({
 
                         <View style={styles.buttonContainer}>
                             <Pressable
-                                style={[styles.button, styles.cancelButton, { borderColor: colors.border }]}
+                                style={[styles.button, styles.cancelButton, { borderColor: colors.mutedForeground }]}
                                 onPress={onDismiss}
                             >
                                 <ThemedText style={{ color: colors.text }}>Later</ThemedText>
@@ -85,7 +85,7 @@ export default function SotdSuggestionPopup({
                                 <View
                                     style={[styles.buttonGradient, { backgroundColor: colors.primary }]}
                                 >
-                                    <ThemedText style={styles.buttonText}>Pick a Song</ThemedText>
+                                    <ThemedText style={[styles.buttonText, { color: Colors.light.text }]}>Pick a Song</ThemedText>
                                 </View>
                             </Pressable>
                         </View>
