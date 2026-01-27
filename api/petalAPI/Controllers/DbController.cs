@@ -34,6 +34,9 @@ public class DbController : ControllerBase
         _spotifyTokenService = spotifyTokenService;
     }
 
+    /// <summary>
+    /// Retrieves all users from the database (Admin/Debug use).
+    /// </summary>
     [HttpGet("users")]
     public async Task<IActionResult> GetUsers()
     {
@@ -47,6 +50,9 @@ public class DbController : ControllerBase
         return Ok(users);
     }
 
+    /// <summary>
+    /// Retrieves the 50 most recent tracks with enriched artist and album data.
+    /// </summary>
     [HttpGet("tracks")]
     [AllowAnonymous]
     public async Task<IActionResult> getTracks()
@@ -347,7 +353,7 @@ public class DbController : ControllerBase
     }
 
     /// <summary>
-    /// Gets stats about tracks missing album/artist data
+    /// Gets statistical data about tracks missing album or artist information.
     /// </summary>
     [HttpGet("data-integrity-stats")]
     public async Task<IActionResult> GetDataIntegrityStats()

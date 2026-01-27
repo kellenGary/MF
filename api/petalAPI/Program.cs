@@ -30,6 +30,12 @@ builder.Services.AddControllers()
         opts.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
     });
 builder.Services.AddOpenApi();
+builder.Services.AddSwaggerGen(c =>
+{
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    c.IncludeXmlComments(xmlPath);
+});
 builder.Services.AddHttpClient(); // Add HttpClient for Spotify API calls
 
 // Add SQLite Database
@@ -44,7 +50,7 @@ builder.Services.AddScoped<IListeningHistoryService, ListeningHistoryService>();
 builder.Services.AddScoped<IListeningSessionService, ListeningSessionService>();
 builder.Services.AddScoped<IPlaylistSyncService, PlaylistSyncService>();
 builder.Services.AddScoped<ISavedTracksSyncService, SavedTracksSyncService>();
-builder.Services.AddScoped<PostService>();
+builder.Services.AddScoped<IPostService, PostService>();
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
@@ -104,6 +110,8 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     app.UseHttpLogging();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();

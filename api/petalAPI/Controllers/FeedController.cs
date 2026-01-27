@@ -32,8 +32,11 @@ public class FeedController : ControllerBase
     }
 
     /// <summary>
-    /// Get the feed of posts from users the current user follows
+    /// Retrieves the activity feed containing posts from followed users.
     /// </summary>
+    /// <param name="limit">The maximum number of items to return.</param>
+    /// <param name="offset">The number of items to skip.</param>
+    /// <param name="type">Optional filter by post type.</param>
     [HttpGet]
     public async Task<IActionResult> GetFeed(
         [FromQuery] int limit = 20,
@@ -143,8 +146,12 @@ public class FeedController : ControllerBase
     }
 
     /// <summary>
-    /// Get a single user's posts (for profile view)
+    /// Retrieves posts created by a specific user.
     /// </summary>
+    /// <param name="userId">The ID of the user to retrieve posts for.</param>
+    /// <param name="limit">The maximum number of items to return.</param>
+    /// <param name="offset">The number of items to skip.</param>
+    /// <param name="type">Optional filter by post type.</param>
     [HttpGet("user/{userId}")]
     public async Task<IActionResult> GetUserPosts(
         int userId,

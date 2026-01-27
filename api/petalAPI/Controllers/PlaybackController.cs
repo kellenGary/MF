@@ -28,6 +28,9 @@ public class PlaybackController : ControllerBase
         _logger = logger;
     }
 
+    /// <summary>
+    /// Gets the currently playing track from Spotify.
+    /// </summary>
     [HttpGet("currently-playing")]
     public async Task<IActionResult> GetCurrentlyPlaying()
     {
@@ -101,6 +104,9 @@ public class PlaybackController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Retrieves the current Spotify player state.
+    /// </summary>
     [HttpGet("player-state")]
     public async Task<IActionResult> GetPlayerState()
     {
@@ -168,6 +174,11 @@ public class PlaybackController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Starts or resumes playback on the user's active device.
+    /// </summary>
+    /// <param name="uri">Optional Spotify URI to play.</param>
+    /// <param name="contextUri">Optional context URI (algebra, playlist) to play from.</param>
     [HttpPost("play")]
     public async Task<IActionResult> Play([FromQuery] string? uri = null, [FromQuery] string? contextUri = null)
     {
@@ -252,30 +263,47 @@ public class PlaybackController : ControllerBase
         return await SendPlayerRequest("https://api.spotify.com/v1/me/player/play", HttpMethod.Put);
     }
 
+    /// <summary>
+    /// Pauses playback on the user's active device.
+    /// </summary>
     [HttpPost("pause")]
     public async Task<IActionResult> Pause()
     {
         return await SendPlayerRequest("https://api.spotify.com/v1/me/player/pause", HttpMethod.Put);
     }
 
+    /// <summary>
+    /// Skips to the next track.
+    /// </summary>
     [HttpPost("next")]
     public async Task<IActionResult> Next()
     {
         return await SendPlayerRequest("https://api.spotify.com/v1/me/player/next", HttpMethod.Post);
     }
 
+    /// <summary>
+    /// Skips to the previous track.
+    /// </summary>
     [HttpPost("previous")]
     public async Task<IActionResult> Previous()
     {
         return await SendPlayerRequest("https://api.spotify.com/v1/me/player/previous", HttpMethod.Post);
     }
 
+    /// <summary>
+    /// Toggles shuffle mode.
+    /// </summary>
+    /// <param name="state">True to enable shuffle, false to disable.</param>
     [HttpPost("shuffle")]
     public async Task<IActionResult> Shuffle([FromQuery] bool state)
     {
         return await SendPlayerRequest($"https://api.spotify.com/v1/me/player/shuffle?state={state.ToString().ToLower()}", HttpMethod.Put);
     }
 
+    /// <summary>
+    /// Sets the repeat mode.
+    /// </summary>
+    /// <param name="state">The repeat state: 'track', 'context', or 'off'.</param>
     [HttpPost("repeat")]
     public async Task<IActionResult> Repeat([FromQuery] string state)
     {

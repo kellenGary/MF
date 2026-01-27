@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace PetalAPI.Services;
 
-public class PostService
+public class PostService : IPostService
 {
     private readonly AppDbContext _context;
     private readonly ILogger<PostService> _logger;

@@ -35,6 +35,11 @@ public class AuthController : ControllerBase
         _listeningHistoryService = listeningHistoryService;
     }
 
+    /// <summary>
+    /// Handles the Spotify OAuth callback to exchange authorization code for tokens.
+    /// </summary>
+    /// <param name="code">The authorization code returned by Spotify.</param>
+    /// <param name="state">The state parameter for preventing CSRF attacks.</param>
     [HttpGet("callback")]
     public async Task<IActionResult> Callback([FromQuery] string code, [FromQuery] string state)
     {

@@ -29,6 +29,10 @@ public class ListeningHistoryController : ControllerBase
         _context = context;
     }
 
+    /// <summary>
+    /// Manually adds a listening history entry.
+    /// </summary>
+    /// <param name="request">The listening history data.</param>
     [HttpPost("add")]
     public async Task<IActionResult> AddListeningHistory([FromBody] AddListeningHistoryRequest request)
     {
@@ -77,6 +81,10 @@ public class ListeningHistoryController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Syncs the user's recently played tracks from Spotify.
+    /// </summary>
+    /// <param name="request">Optional location data to attach to synced tracks.</param>
     [HttpPost("sync")]
     public async Task<IActionResult> SyncRecentlyPlayed([FromBody] SyncRecentlyPlayedRequest? request)
     {
@@ -111,9 +119,10 @@ public class ListeningHistoryController : ControllerBase
     }
 
     /// <summary>
-    /// Add listening history for the currently playing track using Spotify ID.
-    /// This enables real-time location tracking without waiting for Spotify's Recently Played API.
+    /// Adds a listening history entry for the currently playing track using its Spotify ID.
+    /// Enables real-time location tracking without waiting for Spotify's Recently Played API update.
     /// </summary>
+    /// <param name="request">The currently playing track and location data.</param>
     [HttpPost("add-current")]
     public async Task<IActionResult> AddCurrentlyPlaying([FromBody] AddCurrentlyPlayingRequest request)
     {
@@ -181,6 +190,11 @@ public class ListeningHistoryController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Retrieves the authenticated user's listening history with enriched track data.
+    /// </summary>
+    /// <param name="limit">The maximum number of items to return.</param>
+    /// <param name="offset">The number of items to skip.</param>
     [HttpGet("enriched")]
     public async Task<IActionResult> GetEnrichedListeningHistory(
         [FromQuery] int limit = 50,
@@ -272,6 +286,12 @@ public class ListeningHistoryController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Retrieves enriched listening history for a specific user.
+    /// </summary>
+    /// <param name="userId">The ID of the user to retrieve history for.</param>
+    /// <param name="limit">The maximum number of items to return.</param>
+    /// <param name="offset">The number of items to skip.</param>
     [HttpGet("enriched/{userId}")]
     public async Task<IActionResult> GetEnrichedListeningHistoryByUserId(
         int userId,
@@ -452,9 +472,10 @@ public class ListeningHistoryController : ControllerBase
     }
 
     /// <summary>
-    /// Gets listening history entries with location data from ALL users for the global map.
-    /// Returns entries with valid latitude and longitude coordinates.
+    /// Gets listening history entries with location data from all users for the global map.
     /// </summary>
+    /// <param name="limit">The maximum number of items to return.</param>
+    /// <param name="offset">The number of items to skip.</param>
     [HttpGet("all-with-location")]
     public async Task<IActionResult> GetAllListeningHistoryWithLocation(
         [FromQuery] int limit = 500,
@@ -539,9 +560,9 @@ public class ListeningHistoryController : ControllerBase
     }
 
     /// <summary>
-    /// Gets consecutive day streaks for all tracks played by a user.
-    /// Returns only tracks with streak >= 2 to minimize payload size.
+    /// Gets consecutive day streaks for all tracks played by a user (streak >= 2).
     /// </summary>
+    /// <param name="userId">The ID of the user to retrieve streaks for.</param>
     [HttpGet("streaks/{userId}")]
     public async Task<IActionResult> GetTrackStreaks(int userId)
     {

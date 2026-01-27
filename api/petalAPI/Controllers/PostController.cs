@@ -14,10 +14,10 @@ namespace PetalAPI.Controllers;
 public class PostController : ControllerBase
 {
     private readonly AppDbContext _context;
-    private readonly PostService _postService;
+    private readonly IPostService _postService;
     private readonly ILogger<PostController> _logger;
 
-    public PostController(AppDbContext context, PostService postService, ILogger<PostController> logger)
+    public PostController(AppDbContext context, IPostService postService, ILogger<PostController> logger)
     {
         _context = context;
         _postService = postService;
@@ -35,8 +35,9 @@ public class PostController : ControllerBase
     }
 
     /// <summary>
-    /// Share a track to the feed
+    /// Shares a track to the feed.
     /// </summary>
+    /// <param name="request">The track sharing details.</param>
     [HttpPost("share/track")]
     public async Task<IActionResult> ShareTrack([FromBody] ShareTrackRequest request)
     {
@@ -69,8 +70,9 @@ public class PostController : ControllerBase
     }
 
     /// <summary>
-    /// Share an album to the feed
+    /// Shares an album to the feed.
     /// </summary>
+    /// <param name="request">The album sharing details.</param>
     [HttpPost("share/album")]
     public async Task<IActionResult> ShareAlbum([FromBody] ShareAlbumRequest request)
     {
@@ -102,8 +104,9 @@ public class PostController : ControllerBase
     }
 
     /// <summary>
-    /// Share a playlist to the feed
+    /// Shares a playlist to the feed.
     /// </summary>
+    /// <param name="request">The playlist sharing details.</param>
     [HttpPost("share/playlist")]
     public async Task<IActionResult> SharePlaylist([FromBody] SharePlaylistRequest request)
     {
@@ -135,8 +138,9 @@ public class PostController : ControllerBase
     }
 
     /// <summary>
-    /// Share an artist to the feed
+    /// Shares an artist to the feed.
     /// </summary>
+    /// <param name="request">The artist sharing details.</param>
     [HttpPost("share/artist")]
     public async Task<IActionResult> ShareArtist([FromBody] ShareArtistRequest request)
     {
@@ -168,8 +172,9 @@ public class PostController : ControllerBase
     }
 
     /// <summary>
-    /// Create a listening session post from recent listening history
+    /// Creates a listening session post from recent listening history.
     /// </summary>
+    /// <param name="request">The listening session details.</param>
     [HttpPost("listening-session")]
     public async Task<IActionResult> CreateListeningSession([FromBody] CreateListeningSessionRequest request)
     {
@@ -195,8 +200,9 @@ public class PostController : ControllerBase
     }
 
     /// <summary>
-    /// Delete a post (only owner can delete)
+    /// Deletes a post (only owner can delete).
     /// </summary>
+    /// <param name="postId">The ID of the post to delete.</param>
     [HttpDelete("{postId}")]
     public async Task<IActionResult> DeletePost(int postId)
     {
@@ -213,7 +219,7 @@ public class PostController : ControllerBase
     }
 
     /// <summary>
-    /// Seed dummy posts for testing (dev only)
+    /// Seeds dummy posts for testing (Developer Only).
     /// </summary>
     [HttpPost("seed")]
     [AllowAnonymous]

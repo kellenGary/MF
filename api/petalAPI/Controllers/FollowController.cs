@@ -32,8 +32,9 @@ public class FollowController : ControllerBase
     }
 
     /// <summary>
-    /// Follow a user
+    /// Follows a user.
     /// </summary>
+    /// <param name="targetUserId">The ID of the user to follow.</param>
     [HttpPost("{targetUserId}")]
     public async Task<IActionResult> FollowUser(int targetUserId)
     {
@@ -80,8 +81,9 @@ public class FollowController : ControllerBase
     }
 
     /// <summary>
-    /// Unfollow a user
+    /// Unfollows a user.
     /// </summary>
+    /// <param name="targetUserId">The ID of the user to unfollow.</param>
     [HttpDelete("{targetUserId}")]
     public async Task<IActionResult> UnfollowUser(int targetUserId)
     {
@@ -108,8 +110,9 @@ public class FollowController : ControllerBase
     }
 
     /// <summary>
-    /// Check if current user is following a specific user
+    /// Checks if the authenticated user is following a specific user.
     /// </summary>
+    /// <param name="targetUserId">The ID of the user to check.</param>
     [HttpGet("status/{targetUserId}")]
     public async Task<IActionResult> GetFollowStatus(int targetUserId)
     {
@@ -126,8 +129,9 @@ public class FollowController : ControllerBase
     }
 
     /// <summary>
-    /// Check follow status for multiple users at once
+    /// Checks follow status for multiple users in a single request.
     /// </summary>
+    /// <param name="userIds">A list of user IDs to check.</param>
     [HttpPost("status/batch")]
     public async Task<IActionResult> GetFollowStatusBatch([FromBody] int[] userIds)
     {
@@ -153,8 +157,11 @@ public class FollowController : ControllerBase
     }
 
     /// <summary>
-    /// Get followers of a user
+    /// Retrieves a list of users who follow the specified user.
     /// </summary>
+    /// <param name="userId">The ID of the user whose followers to retrieve.</param>
+    /// <param name="limit">The maximum number of items to return.</param>
+    /// <param name="offset">The number of items to skip.</param>
     [HttpGet("followers/{userId}")]
     public async Task<IActionResult> GetFollowers(int userId, [FromQuery] int limit = 50, [FromQuery] int offset = 0)
     {
@@ -201,8 +208,11 @@ public class FollowController : ControllerBase
     }
 
     /// <summary>
-    /// Get users that a user is following
+    /// Retrieves a list of users that the specified user is following.
     /// </summary>
+    /// <param name="userId">The ID of the user whose following list to retrieve.</param>
+    /// <param name="limit">The maximum number of items to return.</param>
+    /// <param name="offset">The number of items to skip.</param>
     [HttpGet("following/{userId}")]
     public async Task<IActionResult> GetFollowing(int userId, [FromQuery] int limit = 50, [FromQuery] int offset = 0)
     {
@@ -249,8 +259,9 @@ public class FollowController : ControllerBase
     }
 
     /// <summary>
-    /// Get follower and following counts for a user
+    /// Retrieves follower and following counts for a user.
     /// </summary>
+    /// <param name="userId">The ID of the user to retrieve counts for.</param>
     [HttpGet("counts/{userId}")]
     public async Task<IActionResult> GetFollowCounts(int userId)
     {

@@ -37,6 +37,9 @@ public class SpotifyController : ControllerBase
         _savedTracksSyncService = savedTracksSyncService;
     }
 
+    /// <summary>
+    /// Manually triggers a sync of the user's playlists from Spotify.
+    /// </summary>
     [HttpPost("playlists/sync")]
     public async Task<IActionResult> SyncPlaylists()
     {
@@ -67,6 +70,9 @@ public class SpotifyController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Manually triggers a sync of the user's saved tracks from Spotify.
+    /// </summary>
     [HttpPost("saved-tracks/sync")]
     public async Task<IActionResult> SyncSavedTracks()
     {
@@ -97,6 +103,9 @@ public class SpotifyController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Retrieves the user's playlists directly from Spotify.
+    /// </summary>
     [HttpGet("playlists")]
     public async Task<IActionResult> GetPlaylists()
     {
@@ -142,6 +151,10 @@ public class SpotifyController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Retrieves a specific playlist directly from Spotify.
+    /// </summary>
+    /// <param name="playlistId">The Spotify ID of the playlist.</param>
     [HttpGet("playlists/{playlistId}")]
     public async Task<IActionResult> GetPlaylist(string playlistId)
     {
@@ -186,6 +199,10 @@ public class SpotifyController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Retrieves tracks from a specific playlist directly from Spotify.
+    /// </summary>
+    /// <param name="playlistId">The Spotify ID of the playlist.</param>
     [HttpGet("playlists/{playlistId}/tracks")]
     public async Task<IActionResult> GetPlaylistTracks(string playlistId)
     {
@@ -230,6 +247,10 @@ public class SpotifyController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Retrieves details for a specific track directly from Spotify.
+    /// </summary>
+    /// <param name="songId">The Spotify ID of the track.</param>
     [HttpGet("songs/{songId}")]
     public async Task<IActionResult> GetSongDetails(string songId)
     {
@@ -274,6 +295,10 @@ public class SpotifyController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Checks if a song is in the user's valid Spotify library.
+    /// </summary>
+    /// <param name="songId">The Spotify ID of the track.</param>
     [HttpGet("songs/{songId}/liked")]
     public async Task<IActionResult> CheckIfSongIsLiked(string songId)
     {
@@ -319,6 +344,10 @@ public class SpotifyController : ControllerBase
     }
 
 
+    /// <summary>
+    /// Removes a song from the user's Spotify library.
+    /// </summary>
+    /// <param name="songId">The Spotify ID of the track.</param>
     [HttpPost("songs/{songId}/unlike")]
     public async Task<IActionResult> UnlikeSong(string songId)
     {
@@ -354,6 +383,10 @@ public class SpotifyController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Adds a song to the user's Spotify library.
+    /// </summary>
+    /// <param name="songId">The Spotify ID of the track.</param>
     [HttpPost("songs/{songId}/like")]
     public async Task<IActionResult> LikeSong(string songId)
     {
@@ -389,6 +422,9 @@ public class SpotifyController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Retrieves the user's recently played tracks directly from Spotify.
+    /// </summary>
     [HttpGet("recently-played")]
     public async Task<IActionResult> GetRecentlyPlayed()
     {
@@ -432,6 +468,9 @@ public class SpotifyController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Retrieves the user's liked songs directly from Spotify.
+    /// </summary>
     [HttpGet("liked-songs")]
     public async Task<IActionResult> GetLikedSongs()
     {
@@ -476,6 +515,9 @@ public class SpotifyController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Retrieves new releases directly from Spotify.
+    /// </summary>
     [HttpGet("new-releases")]
     public async Task<IActionResult> GetNewReleases() 
     {
@@ -537,6 +579,10 @@ public class SpotifyController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Retrieves artist details directly from Spotify.
+    /// </summary>
+    /// <param name="artistId">The Spotify ID of the artist.</param>
     [HttpGet("artists/{artistId}")]
     public async Task<IActionResult> GetArtist(string artistId)
     {
@@ -581,6 +627,10 @@ public class SpotifyController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Retrieves an artist's top tracks directly from Spotify.
+    /// </summary>
+    /// <param name="artistId">The Spotify ID of the artist.</param>
     [HttpGet("artists/{artistId}/top-tracks")]
     public async Task<IActionResult> GetArtistTopTracks(string artistId)
     {
@@ -625,6 +675,10 @@ public class SpotifyController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Retrieves an artist's albums directly from Spotify.
+    /// </summary>
+    /// <param name="artistId">The Spotify ID of the artist.</param>
     [HttpGet("artists/{artistId}/albums")]
     public async Task<IActionResult> GetArtistAlbums(string artistId)
     {

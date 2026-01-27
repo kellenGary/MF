@@ -20,6 +20,9 @@ public class AppProfileController : ControllerBase
         _logger = logger;
     }
 
+    /// <summary>
+    /// Retrieves the profile of the currently authenticated user.
+    /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetAppProfile()
     {
@@ -59,6 +62,10 @@ public class AppProfileController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Retrieves a specific user's profile by their ID.
+    /// </summary>
+    /// <param name="userId">The ID of the user to retrieve.</param>
     [HttpGet("{userId}")]
     public async Task<IActionResult> GetAppProfileById(int userId)
     {
@@ -99,6 +106,10 @@ public class AppProfileController : ControllerBase
         public string? Bio { get; set; }
     }
 
+    /// <summary>
+    /// Updates the authenticated user's profile information.
+    /// </summary>
+    /// <param name="dto">The profile update data.</param>
     [HttpPut]
     public async Task<IActionResult> UpdateAppProfile([FromBody] UpdateAppProfileDto dto)
     {

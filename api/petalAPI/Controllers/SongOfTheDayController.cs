@@ -30,8 +30,9 @@ public class SongOfTheDayController : ControllerBase
     }
 
     /// <summary>
-    /// Set song of the day for current user
+    /// Sets the song of the day for the current user.
     /// </summary>
+    /// <param name="request">The song of the day details.</param>
     [HttpPost]
     public async Task<IActionResult> SetSongOfTheDay([FromBody] SetSotdRequest request)
     {
@@ -76,7 +77,7 @@ public class SongOfTheDayController : ControllerBase
     }
 
     /// <summary>
-    /// Get current user's song of the day for today
+    /// Retrieves the current user's song of the day for today.
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetSongOfTheDay()
@@ -89,8 +90,9 @@ public class SongOfTheDayController : ControllerBase
     }
 
     /// <summary>
-    /// Get another user's song of the day for today
+    /// Retrieves another user's song of the day for today.
     /// </summary>
+    /// <param name="userId">The ID of the user to retrieve the song for.</param>
     [HttpGet("{userId}")]
     public async Task<IActionResult> GetSongOfTheDayByUserId(int userId)
     {

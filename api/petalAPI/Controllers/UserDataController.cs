@@ -42,7 +42,7 @@ public class UserDataController : ControllerBase
     }
 
     /// <summary>
-    /// Gets user's playlists from the database (synced from Spotify)
+    /// Retrieves the user's playlists from the database (synced from Spotify).
     /// </summary>
     [HttpGet("playlists")]
     public async Task<IActionResult> GetPlaylists()
@@ -56,8 +56,9 @@ public class UserDataController : ControllerBase
     }
 
     /// <summary>
-    /// Gets another user's playlists from the database
+    /// Retrieves another user's playlists from the database.
     /// </summary>
+    /// <param name="targetUserId">The ID of the user to retrieve playlists for.</param>
     [HttpGet("playlists/{targetUserId}")]
     public async Task<IActionResult> GetPlaylistsByUserId(int targetUserId)
     {
@@ -109,8 +110,9 @@ public class UserDataController : ControllerBase
     }
 
     /// <summary>
-    /// Gets a specific playlist with its tracks from the database by Spotify playlist ID
+    /// Retrieves a specific playlist with its tracks from the database by Spotify playlist ID.
     /// </summary>
+    /// <param name="spotifyPlaylistId">The Spotify ID of the playlist.</param>
     [HttpGet("playlist/{spotifyPlaylistId}")]
     public async Task<IActionResult> GetPlaylistWithTracks(string spotifyPlaylistId)
     {
@@ -191,8 +193,9 @@ public class UserDataController : ControllerBase
     }
 
     /// <summary>
-    /// Gets a specific album with its tracks. If not cached, fetches from Spotify and stores in AlbumTracks.
+    /// Retrieves a specific album with its tracks. If not cached, fetches from Spotify and stores in AlbumTracks.
     /// </summary>
+    /// <param name="spotifyAlbumId">The Spotify ID of the album.</param>
     [HttpGet("album/{spotifyAlbumId}")]
     public async Task<IActionResult> GetAlbumWithTracks(string spotifyAlbumId)
     {
@@ -538,9 +541,10 @@ public class UserDataController : ControllerBase
     }
 
     /// <summary>
-    /// Gets user's liked tracks from the database (synced from Spotify)
-    /// Uses UserLikedTracksEnriched view for efficient querying
+    /// Retrieves the user's liked tracks from the database using the UserLikedTracksEnriched view.
     /// </summary>
+    /// <param name="limit">The maximum number of items to return.</param>
+    /// <param name="offset">The number of items to skip.</param>
     [HttpGet("liked-tracks")]
     public async Task<IActionResult> GetLikedTracks(
         [FromQuery] int limit = 50,
@@ -555,8 +559,11 @@ public class UserDataController : ControllerBase
     }
 
     /// <summary>
-    /// Gets another user's liked tracks from the database
+    /// Retrieves another user's liked tracks from the database.
     /// </summary>
+    /// <param name="targetUserId">The ID of the user to retrieve liked tracks for.</param>
+    /// <param name="limit">The maximum number of items to return.</param>
+    /// <param name="offset">The number of items to skip.</param>
     [HttpGet("liked-tracks/{targetUserId}")]
     public async Task<IActionResult> GetLikedTracksByUserId(
         int targetUserId,
@@ -654,8 +661,10 @@ public class UserDataController : ControllerBase
     }
 
     /// <summary>
-    /// Gets user's recently played tracks from database
+    /// Retrieves the user's recently played tracks from the database listening history.
     /// </summary>
+    /// <param name="limit">The maximum number of items to return.</param>
+    /// <param name="offset">The number of items to skip.</param>
     [HttpGet("recently-played")]
     public async Task<IActionResult> GetRecentlyPlayed(
         [FromQuery] int limit = 50,
@@ -670,8 +679,11 @@ public class UserDataController : ControllerBase
     }
 
     /// <summary>
-    /// Gets another user's recently played tracks from database
+    /// Retrieves another user's recently played tracks from the database listening history.
     /// </summary>
+    /// <param name="targetUserId">The ID of the user to retrieve recently played tracks for.</param>
+    /// <param name="limit">The maximum number of items to return.</param>
+    /// <param name="offset">The number of items to skip.</param>
     [HttpGet("recently-played/{targetUserId}")]
     public async Task<IActionResult> GetRecentlyPlayedByUserId(
         int targetUserId,
@@ -758,8 +770,10 @@ public class UserDataController : ControllerBase
     }
 
     /// <summary>
-    /// Gets user's liked albums from the database (synced from Spotify)
+    /// Retrieves the user's liked albums from the database (synced from Spotify).
     /// </summary>
+    /// <param name="limit">The maximum number of items to return.</param>
+    /// <param name="offset">The number of items to skip.</param>
     [HttpGet("liked-albums")]
     public async Task<IActionResult> GetLikedAlbums(
         [FromQuery] int limit = 50,
@@ -774,8 +788,11 @@ public class UserDataController : ControllerBase
     }
 
     /// <summary>
-    /// Gets another user's liked albums from the database
+    /// Retrieves another user's liked albums from the database.
     /// </summary>
+    /// <param name="targetUserId">The ID of the user to retrieve liked albums for.</param>
+    /// <param name="limit">The maximum number of items to return.</param>
+    /// <param name="offset">The number of items to skip.</param>
     [HttpGet("liked-albums/{targetUserId}")]
     public async Task<IActionResult> GetLikedAlbumsByUserId(
         int targetUserId,
@@ -845,8 +862,10 @@ public class UserDataController : ControllerBase
     }
 
     /// <summary>
-    /// Gets user's followed artists from the database (synced from Spotify)
+    /// Retrieves the user's followed artists from the database (synced from Spotify).
     /// </summary>
+    /// <param name="limit">The maximum number of items to return.</param>
+    /// <param name="offset">The number of items to skip.</param>
     [HttpGet("followed-artists")]
     public async Task<IActionResult> GetFollowedArtists(
         [FromQuery] int limit = 50,
@@ -861,8 +880,11 @@ public class UserDataController : ControllerBase
     }
 
     /// <summary>
-    /// Gets another user's followed artists from the database
+    /// Retrieves another user's followed artists from the database.
     /// </summary>
+    /// <param name="targetUserId">The ID of the user to retrieve followed artists for.</param>
+    /// <param name="limit">The maximum number of items to return.</param>
+    /// <param name="offset">The number of items to skip.</param>
     [HttpGet("followed-artists/{targetUserId}")]
     public async Task<IActionResult> GetFollowedArtistsByUserId(
         int targetUserId,

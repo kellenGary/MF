@@ -34,6 +34,10 @@ public class ProfileController : ControllerBase
         _context = context;
     }
 
+    /// <summary>
+    /// Checks if a user handle is already taken.
+    /// </summary>
+    /// <param name="handle">The handle to check.</param>
     [HttpGet("handle-exists")]
     public async Task<IActionResult> HandleExists([FromQuery] string handle)
     {
@@ -63,6 +67,9 @@ public class ProfileController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Retrieves the current user's profile from Spotify.
+    /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetProfile()
     {
@@ -108,6 +115,9 @@ public class ProfileController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Retrieves the authenticated user's top artists from Spotify.
+    /// </summary>
     [HttpGet("top-artists")]
     public async Task<IActionResult> GetTopArtists()
     {
@@ -128,6 +138,10 @@ public class ProfileController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Retrieves a specific user's top artists.
+    /// </summary>
+    /// <param name="targetUserId">The ID of the user to retrieve top artists for.</param>
     [HttpGet("top-artists/{targetUserId}")]
     public async Task<IActionResult> GetTopArtistsForUser(int targetUserId)
     {
@@ -178,7 +192,7 @@ public class ProfileController : ControllerBase
     }
 
     /// <summary>
-    /// Delete user account and all associated data (iOS App Store requirement)
+    /// Soft deletes the user account and anonymizes all associated data.
     /// </summary>
     [HttpDelete]
     public async Task<IActionResult> DeleteAccount()

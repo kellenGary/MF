@@ -20,8 +20,9 @@ public class TracksController : ControllerBase
     }
 
     /// <summary>
-    /// Gets a single track by native Track Id (not Spotify id) using the TrackDetailsWithArtists view
+    /// Gets a single track by its internal ID (not Spotify ID) using the detailed view.
     /// </summary>
+    /// <param name="trackId">The internal ID of the track.</param>
     [HttpGet("{trackId}")]
     public async Task<IActionResult> GetTrackById(int trackId)
     {
@@ -77,8 +78,10 @@ public class TracksController : ControllerBase
     }
 
     /// <summary>
-    /// Gets users who have liked this track (prioritizes users you follow)
+    /// Gets users who have liked a specific track, prioritizing users the current user follows.
     /// </summary>
+    /// <param name="trackId">The internal ID of the track.</param>
+    /// <param name="limit">The maximum number of items to return.</param>
     [HttpGet("{trackId}/fans")]
     public async Task<IActionResult> GetTrackFans(int trackId, [FromQuery] int limit = 10)
     {
