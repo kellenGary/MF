@@ -1,15 +1,18 @@
-// Home / Feed screen for the app's main tab.
-// - Displays a map hero, a "listening now" horizontal strip, and the user's feed.
-// - Fetches feed items from `feedApi` and renders each post card.
-// This file is written as a functional React component using hooks and React Native UI primitives.
 import Feed from "@/components/Feed";
+import FollowingSotds from "@/components/following-sotds";
+import Hero from "@/components/hero";
+import SotdSuggestionPopup from "@/components/sotd-suggestion-popup";
+import { ThemedText } from '@/components/themed-text';
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLocation } from "@/contexts/LocationContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import useUserContent from "@/hooks/useUserContent";
+import { router } from "expo-router";
+import { useEffect, useState } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
 import MapView from "react-native-maps";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Main exported screen component for the Home / Feed tab.
 // Responsibilities:
@@ -20,82 +23,103 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const colors = Colors[isDark ? "dark" : "light"];
-  const { isAuthenticated, user } = useAuth();
+  const { user } = useAuth();
+  const { location } = useLocation();
+  const { sotd, fetchSotd, loading } = useUserContent();
+  const [showSotdPopup, setShowSotdPopup] = useState(false);
+  const insets = useSafeAreaInsets();
+
+  // Check for SOTD on mount
+  useEffect(() => {
+    fetchSotd();
+  }, []);
+
+  // Show popup if SOTD is not set (and not loading)
+  useEffect(() => {
+    if (!loading.sotd && sotd === null) {
+      // Delay slightly to be less jarring
+      const timer = setTimeout(() => {
+        setShowSotdPopup(true);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [loading.sotd, sotd]);
 
   // Feed is rendered by the `Feed` component; item rendering lives in `FeedItem`.
-
   const renderHeader = () => (
     <>
       {/* Hero */}
-      <View style={styles.headerGradient}>
-        {/* Hero Header */}
-        <View style={styles.headerContainer}>
-          <Image
-            source={!isDark ? require("../../assets/images/black-icon.png") : require("../../assets/images/icon.png")}
-            style={styles.headerImage}
-          />
-          <Text style={[styles.headerText, { color: colors.text }]}>Welcome {user?.displayName}</Text>
-        </View>
-
+      <View style={styles.headerWrapper}>
+        <Hero/>
         <View style={styles.headerContentContainer}>
-          {/* Map Section */}
-          <MapView style={styles.map} />
-
           {/* Live Listeners Section */}
-          <View style={styles.activeContainer}>
-            <Text style={[styles.activeHeaderText, { color: colors.text }]}>Listening Now</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.activeScrollView}
-              contentContainerStyle={styles.activeScrollContent}
-            >
-              <View style={styles.listenerCard}>
-                <View style={styles.songBubble}>
-                  <Text style={[styles.songName, { color: Colors.light.text }]} numberOfLines={2}>
-                    songName
-                  </Text>
-                </View>
-                <View style={styles.profileImageContainer}>
-                  <Image
-                    source={{ uri: "https://i.pravatar.cc/300?img=12" }}
-                    style={styles.profileImage}
-                  />
-                </View>
-                <Text style={[styles.username, { color: colors.text }]}>Name</Text>
+          {/* <LiveListeners /> */}
+
+          {/* Following Songs of the Day Section */}
+          <FollowingSotds />
+
+          {/* Map Section */}
+          <Pressable
+            style={styles.map}
+            onPress={() => router.push("/(tabs)/map")}
+          >
+            {location ? (
+              <MapView
+                style={styles.map}
+                region={{
+                  latitude: location.latitude,
+                  longitude: location.longitude,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
+                }}
+                showsUserLocation
+                scrollEnabled={false}
+                zoomEnabled={false}
+                rotateEnabled={false}
+                pitchEnabled={false}
+                showsCompass={false}
+                showsPointsOfInterest={false}
+                showsBuildings={false}
+              />
+            ) : (
+              <View
+                style={[
+                  styles.map,
+                  {
+                    backgroundColor: colors.background,
+                    justifyContent: "center",
+                    alignItems: "center",
+                  },
+                ]}
+              >
+                <ThemedText style={{ color: colors.text }}>Loading location...</ThemedText>
               </View>
-            </ScrollView>
-          </View>
+            )}
+          </Pressable>
+
+
         </View>
       </View>
-      
+
       {/* Feed Header */}
       <View style={styles.feedHeaderContainer}>
-        <Text style={[styles.activeHeaderText, { color: colors.text }]}>Your Feed</Text>
+        <ThemedText style={[styles.activeHeaderText, { color: colors.text }]}>
+          Your Feed
+        </ThemedText>
       </View>
     </>
-  );
-
-  const renderFooter = () => {
-    return null;
-  };
-
-  const renderEmpty = () => (
-    <View />
   );
 
   // renderEmpty: shown when the feed has no items — encourages discovery by following users.
 
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={colors.gradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={styles.containerGradient}
-      >
-        <Feed ListHeaderComponent={renderHeader} />
-      </LinearGradient>
+    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+      <Feed ListHeaderComponent={renderHeader()} />
+
+      <SotdSuggestionPopup
+        visible={showSotdPopup}
+        onDismiss={() => setShowSotdPopup(false)}
+      />
     </View>
   );
 }
@@ -110,106 +134,48 @@ const styles = StyleSheet.create({
   flatListContent: {
     paddingBottom: 100,
   },
-  headerGradient: {
+  headerWrapper: {
     width: "100%",
-    gap: 32,
+    gap: 12,
   },
   headerContainer: {
     width: "100%",
-    flexDirection: "column",
-    alignItems: "center",
+    flexDirection: "row",
     justifyContent: "space-between",
-    paddingTop: 32,
+    alignItems: "center",
   },
   headerImage: {
-    width: 96,
-    height: 96,
-  },
-  headerText: {
-    fontSize: 24,
-    fontWeight: "600",
-    color: "black",
+    width: 24,
+    height: 24,
   },
   headerContentContainer: {
     flexDirection: "column",
     alignItems: "center",
     gap: 12,
-    paddingHorizontal: 16,
   },
   map: {
     height: 240,
     width: "100%",
     borderRadius: 16,
-  },
-  activeContainer: {
-    width: "100%",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   activeHeaderText: {
     fontSize: 16,
     fontWeight: "500",
     color: "black",
-    marginBottom: 12,
-  },
-  activeScrollView: {
-    width: "100%",
-  },
-  activeScrollContent: {
-    gap: 16,
-    paddingVertical: 8,
-  },
-  listenerCard: {
-    alignItems: "center",
-  },
-  songBubble: {
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    maxWidth: 120,
-    minHeight: 40,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    marginBottom: -12,
-    zIndex: 1,
-  },
-  songName: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#000",
-    textAlign: "center",
-  },
-  profileImageContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 3,
-    borderColor: "#667eea",
-    padding: 2,
-  },
-  profileImage: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 28,
-  },
-  username: {
-    fontSize: 12,
-    fontWeight: "500",
-    color: "black",
-    textAlign: "center",
-    marginTop: 8,
   },
   sectionContainer: {
     paddingHorizontal: 16,
     marginTop: 24,
   },
   feedHeaderContainer: {
-    paddingHorizontal: 16,
     marginTop: 24,
   },
-  
 });

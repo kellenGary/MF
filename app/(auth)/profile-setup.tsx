@@ -1,3 +1,4 @@
+import { ThemedText } from '@/components/themed-text';
 import { useAuth } from "@/contexts/AuthContext";
 import { User } from "@/services/api";
 import profileApi from "@/services/profileApi";
@@ -28,7 +29,7 @@ export default function ProfileSetupScreen() {
   const [loading, setLoading] = useState(true);
   const [appProfile, setAppProfile] = useState<User | null>(null);
   const [spotifyProfile, setSpotifyProfile] = useState<SpotifyProfile | null>(
-    null
+    null,
   );
 
   const [displayName, setDisplayName] = useState<string>("");
@@ -49,7 +50,7 @@ export default function ProfileSetupScreen() {
         const defaultHandle =
           ap?.handle ??
           (sp?.display_name
-            ? `@${sp.display_name.replace(/\s+/g, "").toLowerCase()}`
+            ? sp.display_name.replace(/\s+/g, "").toLowerCase()
             : "");
         setDisplayName(defaultDisplay);
         setHandle(defaultHandle);
@@ -86,7 +87,7 @@ export default function ProfileSetupScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <Text>Loading...</Text>
+        <ThemedText>Loading...</ThemedText>
       </View>
     );
   }
@@ -100,17 +101,17 @@ export default function ProfileSetupScreen() {
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.title}>Set up your profile</Text>
-        <Text style={styles.subtitle}>
+        <ThemedText style={styles.title}>Set up your profile</ThemedText>
+        <ThemedText style={styles.subtitle}>
           We prefilled info from Spotify. Make it yours.
-        </Text>
+        </ThemedText>
 
         {profileImage && (
           <Image source={{ uri: profileImage }} style={styles.avatar} />
         )}
 
         <View style={styles.field}>
-          <Text style={styles.label}>Display Name</Text>
+          <ThemedText style={styles.label}>Display Name</ThemedText>
           <TextInput
             style={styles.input}
             value={displayName}
@@ -120,21 +121,21 @@ export default function ProfileSetupScreen() {
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.label}>Handle</Text>
+          <ThemedText style={styles.label}>Handle</ThemedText>
           <TextInput
             style={styles.input}
             value={handle}
             onChangeText={setHandle}
             autoCapitalize="none"
-            placeholder="@yourname"
+            placeholder="yourhandle"
           />
-          <Text style={styles.help}>
+          <ThemedText style={styles.help}>
             Handles must be unique; you can change later.
-          </Text>
+          </ThemedText>
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.label}>Bio</Text>
+          <ThemedText style={styles.label}>Bio</ThemedText>
           <TextInput
             style={[styles.input, styles.textarea]}
             value={bio}
@@ -145,7 +146,7 @@ export default function ProfileSetupScreen() {
         </View>
 
         <Pressable style={styles.button} onPress={onSave}>
-          <Text style={styles.buttonText}>Save and Continue</Text>
+          <ThemedText style={styles.buttonText}>Save and Continue</ThemedText>
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>

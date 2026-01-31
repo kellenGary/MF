@@ -1,3 +1,4 @@
+import { ThemedText } from '@/components/themed-text';
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -8,12 +9,12 @@ import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -26,24 +27,24 @@ export default function ProfileEditor() {
 
   // Local editable copy of profile fields
   const [displayName, setDisplayName] = useState<string>(
-    user?.displayName ?? ""
+    user?.displayName ?? "",
   );
   const [handle, setHandle] = useState<string>(user?.handle ?? "");
   const [bio, setBio] = useState<string>(user?.bio ?? "");
   const [profileImageUrl, setProfileImageUrl] = useState<string>(
-    user?.profileImageUrl ?? ""
+    user?.profileImageUrl ?? "",
   );
 
   const [error, setError] = useState<string | null>(null);
 
   const handleExists = async (handleToCheck: string) => {
     try {
-        return await profileApi.checkHandleExists(handleToCheck);
+      return await profileApi.checkHandleExists(handleToCheck);
     } catch (e) {
-        console.error("Failed to check handle existence:", e);
-        return false;
+      console.error("Failed to check handle existence:", e);
+      return false;
     }
-  }
+  };
 
   // Sync with auth user if it changes
   useEffect(() => {
@@ -101,21 +102,21 @@ export default function ProfileEditor() {
         <Pressable onPress={onCancel} style={styles.headerButton}>
           <MaterialIcons name="arrow-back" size={24} color={colors.icon} />
         </Pressable>
-        <Text style={[styles.title, { color: colors.text }]}>Edit Profile</Text>
+        <ThemedText style={[styles.title, { color: colors.text }]}>Edit Profile</ThemedText>
         <View style={styles.headerRight}>
           <Pressable
             onPress={onSave}
             style={[styles.saveButton, { backgroundColor: colors.card }]}
           >
-            <Text style={[styles.saveText, { color: Colors.light.text }]}>
+            <ThemedText style={[styles.saveText, { color: Colors.light.text }]}>
               Save
-            </Text>
+            </ThemedText>
           </Pressable>
         </View>
       </View>
       {error && (
         <View style={styles.errorContainer}>
-          <Text style={{ color: "#cc0000", textAlign: "center" }}>{error}</Text>
+          <ThemedText style={{ color: "#cc0000", textAlign: "center" }}>{error}</ThemedText>
         </View>
       )}
 
@@ -130,12 +131,12 @@ export default function ProfileEditor() {
               />
             </View>
             <View style={styles.previewText}>
-              <Text style={[styles.profileName, { color: colors.text }]}>
+              <ThemedText style={[styles.profileName, { color: colors.text }]}>
                 {displayName || user?.displayName || "Your Name"}
-              </Text>
-              <Text style={[styles.handleText, { color: colors.text }]}>
-                {handle ? handle : user?.handle || "@handle"}
-              </Text>
+              </ThemedText>
+              <ThemedText style={[styles.handleText, { color: colors.text }]}>
+                @{handle || user?.handle || "handle"}
+              </ThemedText>
             </View>
           </View>
         </View>
@@ -143,7 +144,10 @@ export default function ProfileEditor() {
         {/* Form Fields */}
         <View style={styles.field}>
           <Pressable
-            style={[styles.editPictureButton, { backgroundColor: colors.primary }]}
+            style={[
+              styles.editPictureButton,
+              { backgroundColor: colors.primary },
+            ]}
             onPress={async () => {
               // ask permission and open image picker
               const perm =
@@ -168,12 +172,14 @@ export default function ProfileEditor() {
               color="#fff"
               style={{ marginRight: 8 }}
             />
-            <Text style={[styles.editPictureText, { color: "#fff" }]}>Edit picture</Text>
+            <ThemedText style={[styles.editPictureText, { color: "#fff" }]}>
+              Edit picture
+            </ThemedText>
           </Pressable>
           <View>
-            <Text style={[styles.label, { color: colors.text }]}>
+            <ThemedText style={[styles.label, { color: colors.text }]}>
               Display name
-            </Text>
+            </ThemedText>
             <TextInput
               value={displayName || ""}
               onChangeText={setDisplayName}
@@ -194,7 +200,7 @@ export default function ProfileEditor() {
           </View>
 
           <View>
-            <Text style={[styles.label, { color: colors.text }]}>Handle</Text>
+            <ThemedText style={[styles.label, { color: colors.text }]}>Handle</ThemedText>
             <TextInput
               value={handle || ""}
               onChangeText={setHandle}
@@ -215,7 +221,7 @@ export default function ProfileEditor() {
           </View>
 
           <View>
-            <Text style={[styles.label, { color: colors.text }]}>Bio</Text>
+            <ThemedText style={[styles.label, { color: colors.text }]}>Bio</ThemedText>
             <TextInput
               value={bio || ""}
               onChangeText={setBio}

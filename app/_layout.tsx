@@ -6,11 +6,13 @@ import {
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import "react-native-reanimated";
 
 import { Colors } from "@/constants/theme";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ListeningHistoryProvider } from "@/contexts/ListeningHistoryContext";
+import { LocationProvider } from "@/contexts/LocationContext";
 import { PlaybackProvider } from "@/contexts/playbackContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
@@ -77,6 +79,33 @@ function RootLayoutNav() {
           animation: "slide_from_right",
         }}
       />
+      <Stack.Screen
+        name="notifications"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [1.0],
+          sheetGrabberVisible: true,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      />
+      <Stack.Screen
+        name="artist/[id]"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [1.0],
+          sheetGrabberVisible: true,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      />
+      <Stack.Screen
+        name="sotd"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [1.0],
+          sheetGrabberVisible: true,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      />
     </Stack>
   );
 }
@@ -85,20 +114,24 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <AuthProvider>
-      <PlaybackProvider>
-        <ListeningHistoryProvider>
-          <ThemeProvider
-            value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
-          >
-            <RootLayoutNav />
-            <StatusBar
-              style={colorScheme === "dark" ? "light" : "dark"}
-              translucent
-            />
-          </ThemeProvider>
-        </ListeningHistoryProvider>
-      </PlaybackProvider>
-    </AuthProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AuthProvider>
+        <LocationProvider>
+          <PlaybackProvider>
+            <ListeningHistoryProvider>
+              <ThemeProvider
+                value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
+              >
+                <RootLayoutNav />
+                <StatusBar
+                  style={colorScheme === "dark" ? "light" : "dark"}
+                  translucent
+                />
+              </ThemeProvider>
+            </ListeningHistoryProvider>
+          </PlaybackProvider>
+        </LocationProvider>
+      </AuthProvider>
+    </GestureHandlerRootView>
   );
 }

@@ -101,11 +101,102 @@ interface LocationHistoryResponse {
   items: LocationHistoryEntry[];
 }
 
+// Types for global location history (all users map view)
+interface LocationUserInfo {
+  id: number;
+  display_name: string;
+  avatar_url?: string;
+}
+
+export interface GlobalLocationHistoryEntry {
+  id: number;
+  played_at: string;
+  latitude: number;
+  longitude: number;
+  location_accuracy?: number;
+  user: LocationUserInfo;
+  track: LocationTrackInfo;
+}
+
+interface GlobalLocationHistoryResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  items: GlobalLocationHistoryEntry[];
+}
+
 class ListeningHistoryService {
+  private lastTrackedSpotifyId: string | null = null;
+
+  /**
+   * Adds listening history for the currently playing track using Spotify ID.
+   * This enables real-time location tracking without waiting for Spotify's Recently Played API delay.
+   *
+   * @param spotifyTrackId - The Spotify ID of the currently playing track
+   * @param progressMs - Current playback position in milliseconds
+   * @param latitude - Optional latitude for location tracking
+   * @param longitude - Optional longitude for location tracking
+   */
+  async addCurrentlyPlaying(
+    spotifyTrackId: string,
+    progressMs: number,
+    latitude?: number,
+    longitude?: number,
+  ): Promise<{ trackName?: string; error?: string }> {
+    // Deduplicate on client side as well to reduce API calls
+    if (this.lastTrackedSpotifyId === spotifyTrackId) {
+      return { trackName: "Already tracked" };
+    }
+
+    const payload: {
+      spotifyTrackId: string;
+      progressMs: number;
+      playedAt: string;
+      latitude?: number;
+      longitude?: number;
+    } = {
+      spotifyTrackId,
+      progressMs,
+      playedAt: new Date().toISOString(),
+    };
+
+    if (latitude !== undefined && longitude !== undefined) {
+      payload.latitude = latitude;
+      payload.longitude = longitude;
+    }
+
+    const response = await api.makeAuthenticatedRequest(
+      "/api/listeninghistory/add-current",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return { error: errorData.error || response.statusText };
+    }
+
+    const data = await response.json();
+    this.lastTrackedSpotifyId = spotifyTrackId;
+    console.log(
+      "[ListeningHistory] Added currently playing:",
+      data.trackName,
+      latitude ? `at (${latitude}, ${longitude})` : "",
+    );
+    return { trackName: data.trackName };
+  }
+
+  private lastTrackedId: number | null = null;
+
   /**
    * Adds a listening history entry with optional location data.
    * Call this when a track finishes playing in the app.
-   * 
+   *
    * @param trackId - The ID of the track in the database
    * @param msPlayed - Milliseconds of the track that was played
    * @param playedAt - When the track was played (defaults to now)
@@ -121,8 +212,11 @@ class ListeningHistoryService {
     contextUri?: string,
     deviceType?: string,
     latitude?: number,
-    longitude?: number
+    longitude?: number,
   ): Promise<void> {
+    if (this.lastTrackedId === trackId) {
+      return;
+    }
     const payload: AddListeningHistoryPayload = {
       trackId,
       msPlayed,
@@ -141,20 +235,21 @@ class ListeningHistoryService {
         headers: {
           "Content-Type": "application/json",
         },
-      }
+      },
     );
 
     if (!response.ok) {
       throw new Error(
-        `Failed to add listening history: ${response.statusText}`
+        `Failed to add listening history: ${response.statusText}`,
       );
     }
+    this.lastTrackedId = trackId;
   }
 
   /**
    * Records when a track has finished playing.
    * Includes optional location data for map tracking.
-   * 
+   *
    * @param trackId - The ID of the track that was played
    * @param durationMs - Total duration of the track in milliseconds
    * @param latitude - Optional latitude
@@ -164,7 +259,7 @@ class ListeningHistoryService {
     trackId: number,
     durationMs: number,
     latitude?: number,
-    longitude?: number
+    longitude?: number,
   ): Promise<void> {
     await this.addListeningHistory(
       trackId,
@@ -173,7 +268,7 @@ class ListeningHistoryService {
       undefined,
       "smartphone",
       latitude,
-      longitude
+      longitude,
     );
   }
 
@@ -181,13 +276,29 @@ class ListeningHistoryService {
    * Syncs recently played tracks from Spotify.
    * Should be called periodically (every 1-5 minutes) in the background.
    * Returns the number of new tracks synced.
+   *
+   * @param latitude - Optional current latitude for location tracking
+   * @param longitude - Optional current longitude for location tracking
    */
-  async syncRecentlyPlayed(): Promise<number> {
+  async syncRecentlyPlayed(
+    latitude?: number,
+    longitude?: number,
+  ): Promise<number> {
+    const body: { latitude?: number; longitude?: number } = {};
+    if (latitude !== undefined && longitude !== undefined) {
+      body.latitude = latitude;
+      body.longitude = longitude;
+    }
+
     const response = await api.makeAuthenticatedRequest(
       "/api/listeninghistory/sync",
       {
         method: "POST",
-      }
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      },
     );
 
     if (!response.ok) {
@@ -200,7 +311,7 @@ class ListeningHistoryService {
 
   /**
    * Gets listening history for the current user.
-   * 
+   *
    * @param limit - Number of records to return (1-1000, default 50)
    * @param offset - Number of records to skip (default 0)
    * @param withLocation - Filter by location data (true = with location, false = without, null = all)
@@ -208,7 +319,7 @@ class ListeningHistoryService {
   async getListeningHistory(
     limit: number = 50,
     offset: number = 0,
-    withLocation?: boolean
+    withLocation?: boolean,
   ): Promise<ListeningHistoryResponse> {
     const params = new URLSearchParams();
     params.append("limit", Math.min(Math.max(limit, 1), 1000).toString());
@@ -218,12 +329,12 @@ class ListeningHistoryService {
     }
 
     const response = await api.makeAuthenticatedRequest(
-      `/api/listeninghistory?${params.toString()}`
+      `/api/listeninghistory?${params.toString()}`,
     );
 
     if (!response.ok) {
       throw new Error(
-        `Failed to fetch listening history: ${response.statusText}`
+        `Failed to fetch listening history: ${response.statusText}`,
       );
     }
 
@@ -234,7 +345,9 @@ class ListeningHistoryService {
    * Gets all listening history entries (paginated).
    * Useful for scrolling or infinite load scenarios.
    */
-  async getAllListeningHistory(pageSize: number = 50): Promise<ListeningHistoryEntry[]> {
+  async getAllListeningHistory(
+    pageSize: number = 50,
+  ): Promise<ListeningHistoryEntry[]> {
     const allEntries: ListeningHistoryEntry[] = [];
     let offset = 0;
     let hasMore = true;
@@ -255,7 +368,7 @@ class ListeningHistoryService {
 
   /**
    * Gets enriched listening history with full track, album, and artist details.
-   * 
+   *
    * @param limit - Number of records to return (1-1000, default 50)
    * @param offset - Number of records to skip (default 0)
    * @param userId - Optional user ID to fetch history for another user
@@ -263,13 +376,13 @@ class ListeningHistoryService {
   async getEnrichedListeningHistory(
     limit: number = 50,
     offset: number = 0,
-    userId?: number
+    userId?: number,
   ): Promise<EnrichedListeningHistoryResponse> {
     const params = new URLSearchParams();
     params.append("limit", Math.min(Math.max(limit, 1), 1000).toString());
     params.append("offset", Math.max(offset, 0).toString());
 
-    const endpoint = userId 
+    const endpoint = userId
       ? `/api/listeninghistory/enriched/${userId}?${params.toString()}`
       : `/api/listeninghistory/enriched?${params.toString()}`;
 
@@ -277,7 +390,7 @@ class ListeningHistoryService {
 
     if (!response.ok) {
       throw new Error(
-        `Failed to fetch enriched listening history: ${response.statusText}`
+        `Failed to fetch enriched listening history: ${response.statusText}`,
       );
     }
 
@@ -288,7 +401,9 @@ class ListeningHistoryService {
    * Gets all enriched listening history entries (paginated).
    * Useful for scrolling or infinite load scenarios with complete track details.
    */
-  async getAllEnrichedListeningHistory(pageSize: number = 50): Promise<EnrichedListeningHistoryEntry[]> {
+  async getAllEnrichedListeningHistory(
+    pageSize: number = 50,
+  ): Promise<EnrichedListeningHistoryEntry[]> {
     const allEntries: EnrichedListeningHistoryEntry[] = [];
     let offset = 0;
     let hasMore = true;
@@ -310,26 +425,73 @@ class ListeningHistoryService {
   /**
    * Gets listening history entries with location data for map display.
    * Only returns entries that have valid latitude and longitude coordinates.
-   * 
+   *
    * @param limit - Number of records to return (1-1000, default 500)
    * @param offset - Number of records to skip (default 0)
    */
   async getListeningHistoryWithLocation(
     limit: number = 500,
-    offset: number = 0
+    offset: number = 0,
   ): Promise<LocationHistoryResponse> {
     const params = new URLSearchParams();
     params.append("limit", Math.min(Math.max(limit, 1), 1000).toString());
     params.append("offset", Math.max(offset, 0).toString());
 
     const response = await api.makeAuthenticatedRequest(
-      `/api/listeninghistory/with-location?${params.toString()}`
+      `/api/listeninghistory/with-location?${params.toString()}`,
     );
 
     if (!response.ok) {
       throw new Error(
-        `Failed to fetch listening history with location: ${response.statusText}`
+        `Failed to fetch listening history with location: ${response.statusText}`,
       );
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Gets listening history entries with location data from ALL users for the global map.
+   * Returns entries with valid latitude and longitude coordinates from all users.
+   *
+   * @param limit - Number of records to return (1-1000, default 500)
+   * @param offset - Number of records to skip (default 0)
+   */
+  async getAllListeningHistoryWithLocation(
+    limit: number = 500,
+    offset: number = 0,
+  ): Promise<GlobalLocationHistoryResponse> {
+    const params = new URLSearchParams();
+    params.append("limit", Math.min(Math.max(limit, 1), 1000).toString());
+    params.append("offset", Math.max(offset, 0).toString());
+
+    const response = await api.makeAuthenticatedRequest(
+      `/api/listeninghistory/all-with-location?${params.toString()}`,
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch all listening history with location: ${response.statusText}`,
+      );
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Gets consecutive day streaks for all tracks played by a user.
+   * Returns a dictionary mapping Spotify track IDs to streak counts.
+   * Only includes tracks with streak >= 2.
+   *
+   * @param userId - The user ID to get streaks for
+   */
+  async getTrackStreaks(userId: number): Promise<Record<string, number>> {
+    const response = await api.makeAuthenticatedRequest(
+      `/api/listeninghistory/streaks/${userId}`,
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch track streaks: ${response.statusText}`);
     }
 
     return await response.json();

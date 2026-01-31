@@ -1,19 +1,28 @@
+import ExploreContent from "@/components/explore-content";
+import FilterBubble from "@/components/filter-bubble";
+import GraphView from "@/components/graph-view";
+import SearchBar from "@/components/search-bar";
+import SearchView from "@/components/search-view";
+import { ThemedText } from "@/components/themed-text";
 import { Colors } from "@/constants/theme";
+import { useAuth } from "@/contexts/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import dbApi from "@/services/dbApi";
 import followApi from "@/services/followApi";
-import { RelativePathString, router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function ExploreScreen() {
+  const { user } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [followStatus, setFollowStatus] = useState<Record<number, boolean>>({});
   const [loadingFollows, setLoadingFollows] = useState<Record<number, boolean>>({});
-  const [trendingSongs, setTrendingSongs] = useState<any[]>([]);
-  const [trendingAlbums, setTrendingAlbums] = useState<any[]>([]);
-  const [trendingPlaylists, setTrendingPlaylists] = useState<any[]>([]);
+  const [connections, setConnections] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"users" | "content">("users");
 
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
@@ -23,8 +32,9 @@ export default function ExploreScreen() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setLoading(true);
         const usersData = await dbApi.getAllUsers();
-        const usersList = usersData?.slice(0, 5) || [];
+        const usersList = usersData || [];
         setUsers(usersList);
 
         // Fetch follow status for all users
@@ -32,257 +42,149 @@ export default function ExploreScreen() {
           const userIds = usersList.map((u: any) => u.id);
           const statuses = await followApi.getFollowStatusBatch(userIds);
           setFollowStatus(statuses);
-        }
 
-        // TODO: Add API endpoints for trending data
-        // const songs = await dbApi.getTrendingSongs();
-        // const albums = await dbApi.getTrendingAlbums();
-        // const playlists = await dbApi.getTrendingPlaylists();
+          // Fetch connections between users
+          const graphConnections = await followApi.getGraphConnections(userIds);
+          setConnections(graphConnections);
+        }
       } catch (error) {
-        console.error("Error fetching explore data:", error);
+        console.error("Error fetching users:", error);
+      } finally {
+        setLoading(false);
       }
     };
     fetchData();
   }, []);
 
-  const handleToggleFollow = useCallback(async (userId: number) => {
-    // Prevent multiple simultaneous requests for the same user
-    if (loadingFollows[userId]) return;
 
-    setLoadingFollows(prev => ({ ...prev, [userId]: true }));
 
-    try {
+  const handleToggleFollow = useCallback(
+    async (userId: number) => {
+      // Prevent multiple taps while request is in flight?
+      // With optimistic updates, we might want to allow it, but for now let's keep the guard
+      // or we can remove the loading check since we update state immediately.
+      // But keeping it prevents spamming the API.
+      if (loadingFollows[userId]) return;
+
       const currentStatus = followStatus[userId] || false;
-      const newStatus = await followApi.toggleFollow(userId, currentStatus);
-      setFollowStatus(prev => ({ ...prev, [userId]: newStatus }));
-    } catch (error) {
-      console.error("Error toggling follow:", error);
-    } finally {
-      setLoadingFollows(prev => ({ ...prev, [userId]: false }));
-    }
-  }, [followStatus, loadingFollows]);
+      const optimisticStatus = !currentStatus;
 
-  const SectionHeader = ({ title }: { title: string }) => (
-    <View style={styles.sectionHeader}>
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
-      <Pressable>
-        <Text style={[styles.seeAll, { color: colors.tint }]}>See All</Text>
-      </Pressable>
-    </View>
-  );
+      // 1. Optimistically update UI
+      setFollowStatus((prev) => ({ ...prev, [userId]: optimisticStatus }));
+      setLoadingFollows((prev) => ({ ...prev, [userId]: true }));
 
-  const handleOpenProfile = (userId: string) => {
-    router.push(`/profile/${userId}` as RelativePathString);
-  }
+      try {
+        // 2. Make API call
+        const confirmedStatus = await followApi.toggleFollow(
+          userId,
+          currentStatus,
+        );
 
-  const UserCard = ({ user }: { user: any }) => {
-    const isFollowing = followStatus[user.id] || false;
-    const isLoading = loadingFollows[user.id] || false;
-
-    return (
-      <Pressable
-        style={[styles.userCard, { borderColor: colors.tabIconDefault }]}
-        onPress={() => handleOpenProfile(user.id)}
-      >
-        <View
-          style={[styles.userAvatar, { backgroundColor: colors.tabIconDefault }]}
-        >
-          {user?.profileImageUrl ? (
-            <Image
-              source={{ uri: user.profileImageUrl }}
-              style={styles.userAvatarImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <Text style={styles.avatarText}>
-              {user?.displayName?.[0]?.toUpperCase() || "?"}
-            </Text>
-          )}
-        </View>
-        <Text style={[styles.userName, { color: colors.text }]} numberOfLines={1}>
-          {user.displayName}
-        </Text>
-        <Pressable
-          style={[
-            styles.followButton,
-            {
-              backgroundColor: isFollowing ? "transparent" : colors.tint,
-              borderWidth: isFollowing ? 1 : 0,
-              borderColor: colors.tint,
-            },
-          ]}
-          onPress={(e) => {
-            e.stopPropagation();
-            handleToggleFollow(user.id);
-          }}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <ActivityIndicator size="small" color={!isFollowing ? Colors.light.text : "#fff"} />
-          ) : (
-            <Text
-              style={[
-                styles.followButtonText,
-                { color: !isFollowing ? Colors.light.text : "#fff" },
-              ]}
-              numberOfLines={1}
-            >
-              {isFollowing ? "Following" : "Follow"}
-            </Text>
-          )}
-        </Pressable>
-      </Pressable>
-    );
-  };
-
-  const SongCard = ({ song }: { song: any }) => (
-    <Pressable style={[styles.itemCard, { backgroundColor: colors.card }]}>
-      <View
-        style={[styles.itemImage, { backgroundColor: colors.tabIconDefault }]}
-      />
-      <View style={styles.itemInfo}>
-        <Text
-          style={[styles.itemTitle, { color: colors.text }]}
-          numberOfLines={1}
-        >
-          {song.title || "Unknown Song"}
-        </Text>
-        <Text
-          style={[styles.itemSubtitle, { color: colors.tabIconDefault }]}
-          numberOfLines={1}
-        >
-          {song.artist || "Unknown Artist"}
-        </Text>
-      </View>
-    </Pressable>
-  );
-
-  const AlbumCard = ({ album }: { album: any }) => (
-    <Pressable style={[styles.gridCard, { backgroundColor: colors.card }]}>
-      <View
-        style={[styles.albumCover, { backgroundColor: colors.tabIconDefault }]}
-      />
-      <Text
-        style={[styles.gridCardTitle, { color: colors.text }]}
-        numberOfLines={2}
-      >
-        {album.title || "Unknown Album"}
-      </Text>
-      <Text
-        style={[styles.gridCardSubtitle, { color: colors.tabIconDefault }]}
-        numberOfLines={1}
-      >
-        {album.artist || "Unknown Artist"}
-      </Text>
-    </Pressable>
-  );
-
-  const PlaylistCard = ({ playlist }: { playlist: any }) => (
-    <Pressable style={[styles.gridCard, { backgroundColor: colors.card }]}>
-      <View
-        style={[
-          styles.playlistCover,
-          { backgroundColor: colors.tabIconDefault },
-        ]}
-      />
-      <Text
-        style={[styles.gridCardTitle, { color: colors.text }]}
-        numberOfLines={2}
-      >
-        {playlist.name || "Unknown Playlist"}
-      </Text>
-      <Text
-        style={[styles.gridCardSubtitle, { color: colors.tabIconDefault }]}
-        numberOfLines={1}
-      >
-        {playlist.trackCount || 0} songs
-      </Text>
-    </Pressable>
+        // 3. Confirm with server response (should match optimistic)
+        if (confirmedStatus !== optimisticStatus) {
+          setFollowStatus((prev) => ({ ...prev, [userId]: confirmedStatus }));
+        }
+      } catch (error) {
+        console.error("Error toggling follow:", error);
+        // 4. Revert on error
+        setFollowStatus((prev) => ({ ...prev, [userId]: currentStatus }));
+      } finally {
+        setLoadingFollows((prev) => ({ ...prev, [userId]: false }));
+      }
+    },
+    [followStatus, loadingFollows],
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }, {backgroundColor: colors.background}]}>
-      <ScrollView
-        style={[styles.scrollContainer]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            Explore
-          </Text>
-          <Text
-            style={[styles.headerSubtitle, { color: colors.tabIconDefault }]}
-          >
-            Discover new music and creators
-          </Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Graph Layer - lowest z-index, fills entire screen */}
+      {activeTab === "users" && (
+        <View style={styles.graphLayer}>
+          {!loading && !searchQuery && (
+            <GraphView
+              users={users}
+              currentUser={user}
+              followStatus={followStatus}
+              onToggleFollow={handleToggleFollow}
+              connections={connections}
+            />
+          )}
+          {loading && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.tint} />
+            </View>
+          )}
         </View>
+      )}
 
-        {/* Recommended Accounts Section */}
-        <View style={styles.section}>
-          <SectionHeader title="Recommended Accounts" />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.horizontalScroll}
-          >
-            {users.map((user) => (
-              <View key={user.id} style={styles.userCardWrapper}>
-                <UserCard user={user} />
-              </View>
-            ))}
-          </ScrollView>
-        </View>
+      {/* Header Overlay - positioned on top, only covers header area */}
+      {!searchQuery && (
+        <View
+          style={[
+            styles.headerOverlay,
+            { paddingTop: insets.top },
+          ]}
+          pointerEvents="box-none"
+        >
+          <View pointerEvents="auto">
+            <View style={styles.header}>
+              <ThemedText type="title">Explore</ThemedText>
+            </View>
 
-        {/* Trending Songs Section */}
-        <View style={styles.section}>
-          <SectionHeader title="Trending Songs" />
-          <View>
-            {[1, 2, 3].map((index) => (
-              <SongCard
-                key={index}
-                song={{
-                  title: `Trending Song ${index}`,
-                  artist: "Artist Name",
-                }}
+            <View style={styles.searchContainer}>
+              <SearchBar
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search by name or username..."
               />
-            ))}
+            </View>
+
+            <View style={styles.tabContainer}>
+              <FilterBubble
+                filterName="Users"
+                activeFilter={activeTab === "users" ? "Users" : "Content"}
+                setActiveFilter={(filter) =>
+                  setActiveTab(filter === "Users" ? "users" : "content")
+                }
+              />
+              <FilterBubble
+                filterName="Content"
+                activeFilter={activeTab === "users" ? "Users" : "Content"}
+                setActiveFilter={(filter) =>
+                  setActiveTab(filter === "Users" ? "users" : "content")
+                }
+              />
+            </View>
           </View>
         </View>
+      )}
 
-        {/* Trending Albums Section */}
-        <View style={styles.section}>
-          <SectionHeader title="Trending Albums" />
-          <View style={styles.gridContainer}>
-            {[1, 2, 3, 4].map((index) => (
-              <View key={index} style={styles.gridItem}>
-                <AlbumCard
-                  album={{ title: `Album ${index}`, artist: "Artist Name" }}
-                />
-              </View>
-            ))}
-          </View>
+      {/* Content tab - replaces graph when active, but only if no search query */}
+      {!searchQuery && activeTab === "content" && (
+        <View style={[styles.contentContainer, { paddingTop: insets.top + 140 }]}>
+          <ExploreContent />
         </View>
+      )}
 
-        {/* Trending Playlists Section */}
-        <View style={styles.section}>
-          <SectionHeader title="Trending Playlists" />
-          <View style={styles.gridContainer}>
-            {[1, 2, 3, 4].map((index) => (
-              <View key={index} style={styles.gridItem}>
-                <PlaylistCard
-                  playlist={{
-                    name: `Playlist ${index}`,
-                    trackCount: Math.floor(Math.random() * 50) + 10,
-                  }}
-                />
-              </View>
-            ))}
+      {/* Search View - renders when there is a query */}
+      {!!searchQuery && (
+        <View style={[styles.searchViewLayer, { paddingTop: insets.top, backgroundColor: colors.background }]}>
+          <View style={styles.header}>
+            <ThemedText type="title">Search</ThemedText>
           </View>
-        </View>
 
-        <View style={styles.spacer} />
-      </ScrollView>
+          <View style={styles.searchContainer}>
+            <SearchBar
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search by name or song..."
+              autoFocus
+            />
+          </View>
+
+          <SearchView query={searchQuery} />
+        </View>
+      )}
     </View>
   );
 }
@@ -291,150 +193,42 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContainer: {
-    flex: 1,
+  graphLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+  },
+  headerOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
   },
   header: {
     paddingHorizontal: 16,
-    paddingBottom: 24,
+    paddingBottom: 12,
   },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: "800",
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-  },
-  section: {
-    marginBottom: 32,
+  searchContainer: {
     paddingHorizontal: 16,
+    paddingBottom: 16,
   },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  seeAll: {
-    fontSize: 13,
-    fontWeight: "500",
-  },
-  horizontalScroll: {
-    marginHorizontal: -16,
-    paddingHorizontal: 16,
-  },
-  userCardWrapper: {
-    marginRight: 12,
-  },
-  userCard: {
-    width: 100,
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  userAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+  loadingContainer: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 8,
   },
-  userAvatarImage: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 30,
-  },
-  avatarText: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#fff",
-  },
-  userName: {
-    fontSize: 13,
-    fontWeight: "500",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  followButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 6,
-    width: "100%",
-  },
-  followButtonText: {
-    fontSize: 12,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  itemCard: {
+  tabContainer: {
     flexDirection: "row",
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginBottom: 8,
+    justifyContent: "center",
     alignItems: "center",
+    gap: 8,
+    paddingVertical: 8,
   },
-  itemImage: {
-    width: 56,
-    height: 56,
-    borderRadius: 8,
-    marginRight: 12,
-  },
-  itemInfo: {
+  contentContainer: {
     flex: 1,
   },
-  itemTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  itemSubtitle: {
-    fontSize: 12,
-  },
-  gridContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
-  gridItem: {
-    width: "48%",
-  },
-  gridCard: {
-    borderRadius: 12,
-    overflow: "hidden",
-  },
-  albumCover: {
-    width: "100%",
-    aspectRatio: 1,
-    marginBottom: 8,
-    borderRadius: 8,
-  },
-  playlistCover: {
-    width: "100%",
-    aspectRatio: 1,
-    marginBottom: 8,
-    borderRadius: 8,
-  },
-  gridCardTitle: {
-    fontSize: 13,
-    fontWeight: "600",
-    paddingHorizontal: 8,
-    marginBottom: 4,
-  },
-  gridCardSubtitle: {
-    fontSize: 11,
-    paddingHorizontal: 8,
-    marginBottom: 8,
-  },
-  spacer: {
-    height: 100,
+  searchViewLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 20,
   },
 });

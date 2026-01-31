@@ -1,24 +1,42 @@
+import { ThemedText } from '@/components/themed-text';
+import {
+  ClusteredMapMarker,
+  ClusteredMarker,
+  clusterMarkers,
+} from "@/components/map";
 import { Colors, Fonts } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import listeningHistoryApi, {
-    LocationHistoryEntry,
+  LocationHistoryEntry,
 } from "@/services/listeningHistoryApi";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import { router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
-    ActivityIndicator,
-    Modal,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
-import MapView, { Marker, Region } from "react-native-maps";
+import MapView, { Region } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+// Helper to get image URL from a history entry
+const getImageUrl = (item: LocationHistoryEntry) => item.track.album?.image_url;
 
 export default function ListeningMapScreen() {
   const insets = useSafeAreaInsets();
@@ -26,68 +44,92 @@ export default function ListeningMapScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const colors = Colors[isDark ? "dark" : "light"];
+  const mapRef = useRef<MapView>(null);
 
   const [locationError, setLocationError] = useState<string | null>(null);
   const [historyItems, setHistoryItems] = useState<LocationHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedMarker, setSelectedMarker] =
-    useState<LocationHistoryEntry | null>(null);
+  const [selectedCluster, setSelectedCluster] =
+    useState<ClusteredMarker<LocationHistoryEntry> | null>(null);
   const [region, setRegion] = useState<Region | null>(null);
 
   // Get user's current location for initial map center
   useEffect(() => {
     async function getCurrentLocation() {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        setLocationError("Permission to access location was denied");
-        return;
-      }
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          setLocationError("Permission to access location was denied");
+          return;
+        }
 
-      const location = await Location.getCurrentPositionAsync({});
-      setRegion({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      });
+        const location = await Location.getCurrentPositionAsync({});
+        setRegion({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
+        });
+      } catch (error) {
+        console.error("Failed to get location:", error);
+      }
     }
 
     getCurrentLocation();
   }, []);
 
   // Fetch listening history with location data
-  const fetchLocationHistory = useCallback(async () => {
-    if (!isAuthenticated) return;
-
-    setLoading(true);
-    try {
-      const data = await listeningHistoryApi.getListeningHistoryWithLocation(
-        500,
-        0
-      );
-      setHistoryItems(data.items);
-
-      // If we have history items but no user location, center on first item
-      if (data.items.length > 0 && !region) {
-        setRegion({
-          latitude: data.items[0].latitude,
-          longitude: data.items[0].longitude,
-          latitudeDelta: 0.1,
-          longitudeDelta: 0.1,
-        });
-      }
-    } catch (error) {
-      console.error("Failed to fetch location history:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [isAuthenticated, region]);
-
   useEffect(() => {
-    fetchLocationHistory();
-  }, [fetchLocationHistory]);
+    async function fetchLocationHistory() {
+      if (!isAuthenticated) return;
 
-  const formatDate = (dateString: string) => {
+      setLoading(true);
+      try {
+        const data = await listeningHistoryApi.getListeningHistoryWithLocation(
+          200, // Reduced limit for better performance
+          0,
+        );
+        setHistoryItems(data.items);
+
+        // If we have history items but no user location, center on first item
+        if (data.items.length > 0 && !region) {
+          setRegion({
+            latitude: data.items[0].latitude,
+            longitude: data.items[0].longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          });
+        }
+      } catch (error) {
+        console.error("Failed to fetch location history:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchLocationHistory();
+  }, [isAuthenticated]);
+
+  // Memoize clustered markers based on region zoom level
+  const clusteredMarkers = useMemo(() => {
+    if (!region) return [];
+    // Adjust cluster radius based on zoom level
+    const clusterRadius = Math.max(region.latitudeDelta * 0.03, 0.0005);
+    return clusterMarkers(historyItems, region, clusterRadius);
+  }, [historyItems, region?.latitudeDelta]);
+
+  const handleMarkerPress = useCallback(
+    (cluster: ClusteredMarker<LocationHistoryEntry>) => {
+      setSelectedCluster(cluster);
+    },
+    [],
+  );
+
+  const handleRegionChange = useCallback((newRegion: Region) => {
+    setRegion(newRegion);
+  }, []);
+
+  const formatDate = useCallback((dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString(undefined, {
       month: "short",
@@ -96,7 +138,7 @@ export default function ListeningMapScreen() {
       hour: "2-digit",
       minute: "2-digit",
     });
-  };
+  }, []);
 
   if (loading && !region) {
     return (
@@ -108,9 +150,9 @@ export default function ListeningMapScreen() {
         ]}
       >
         <ActivityIndicator size="large" color={colors.tint} />
-        <Text style={[styles.loadingText, { color: colors.text }]}>
+        <ThemedText style={[styles.loadingText, { color: colors.text }]}>
           Loading your listening map...
-        </Text>
+        </ThemedText>
       </View>
     );
   }
@@ -127,12 +169,12 @@ export default function ListeningMapScreen() {
         <Pressable style={styles.backButton} onPress={() => router.back()}>
           <MaterialIcons name="arrow-back" size={24} color={colors.icon} />
         </Pressable>
-        <Text style={[styles.errorText, { color: colors.text }]}>
+        <ThemedText style={[styles.errorText, { color: colors.text }]}>
           {locationError}
-        </Text>
-        <Text style={[styles.errorSubtext, { color: colors.text }]}>
+        </ThemedText>
+        <ThemedText style={[styles.errorSubtext, { color: colors.text }]}>
           Enable location permissions to see your listening map
-        </Text>
+        </ThemedText>
       </View>
     );
   }
@@ -140,122 +182,146 @@ export default function ListeningMapScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
+      <LinearGradient
+        colors={["rgba(0,0,0,0.4)", "rgba(0,0,0,0.2)", "transparent"]}
+        style={[styles.header, { paddingTop: insets.top + 8 }]}
+      >
+        <Pressable
+          style={[styles.backButton, { backgroundColor: "colors.icon" }]}
+          onPress={() => router.back()}
+        >
           <MaterialIcons name="arrow-back" size={24} color="#fff" />
         </Pressable>
-        <Text style={styles.headerTitle}>Listening Map</Text>
+        <ThemedText style={styles.headerTitle}>Listening Map</ThemedText>
         <View style={styles.headerSpacer} />
-      </View>
+      </LinearGradient>
 
       {/* Map */}
       {region && (
         <MapView
+          ref={mapRef}
           style={styles.map}
-          region={region}
-          onRegionChangeComplete={setRegion}
-          showsUserLocation
-          showsMyLocationButton
+          initialRegion={region}
+          onRegionChangeComplete={handleRegionChange}
+          showsPointsOfInterest={false}
+          showsBuildings={false}
           userInterfaceStyle={isDark ? "dark" : "light"}
+          moveOnMarkerPress={false}
+          {...(Platform.OS === "ios" ? { loadingEnabled: true } : {})}
         >
-          {historyItems.map((item) => (
-            <Marker
-              key={item.id}
-              coordinate={{
-                latitude: item.latitude,
-                longitude: item.longitude,
-              }}
-              onPress={() => setSelectedMarker(item)}
-            >
-              <View style={styles.markerContainer}>
-                {item.track.album?.image_url ? (
-                  <Image
-                    source={{ uri: item.track.album.image_url }}
-                    style={styles.markerImage}
-                  />
-                ) : (
-                  <View style={styles.markerPlaceholder}>
-                    <MaterialIcons name="music-note" size={16} color="#fff" />
-                  </View>
-                )}
-              </View>
-            </Marker>
+          {clusteredMarkers.map((cluster) => (
+            <ClusteredMapMarker
+              key={cluster.id}
+              cluster={cluster}
+              onPress={handleMarkerPress}
+              getImageUrl={getImageUrl}
+            />
           ))}
         </MapView>
       )}
 
-      {/* Stats overlay */}
-      <View style={[styles.statsOverlay, { bottom: insets.bottom + 16 }]}>
-        <View style={[styles.statsCard, { backgroundColor: colors.card }]}>
-          <Text style={[styles.statsNumber, { color: colors.text }]}>
-            {historyItems.length}
-          </Text>
-          <Text style={[styles.statsLabel, { color: colors.text }]}>
-            Tracked Listens
-          </Text>
-        </View>
-      </View>
-
       {/* Selected marker modal */}
       <Modal
-        visible={selectedMarker !== null}
+        visible={selectedCluster !== null}
         transparent
         animationType="slide"
-        onRequestClose={() => setSelectedMarker(null)}
+        onRequestClose={() => setSelectedCluster(null)}
       >
         <Pressable
           style={styles.modalOverlay}
-          onPress={() => setSelectedMarker(null)}
+          onPress={() => setSelectedCluster(null)}
         >
           <View
             style={[
               styles.modalContent,
-              { backgroundColor: colors.card, paddingBottom: insets.bottom + 16 },
+              {
+                backgroundColor: colors.card,
+                paddingBottom: insets.bottom + 16,
+                maxHeight: "70%",
+              },
             ]}
+            onStartShouldSetResponder={() => true}
           >
-            {selectedMarker && (
+            <View style={styles.modalHandle} />
+            {selectedCluster && (
               <>
-                <View style={styles.modalHandle} />
-                <View style={styles.trackInfo}>
-                  {selectedMarker.track.album?.image_url ? (
-                    <Image
-                      source={{ uri: selectedMarker.track.album.image_url }}
-                      style={styles.trackImage}
-                    />
-                  ) : (
-                    <View style={[styles.trackImage, styles.trackImagePlaceholder]}>
-                      <MaterialIcons name="music-note" size={32} color="#fff" />
-                    </View>
+                <ThemedText style={[styles.clusterInfo, { color: colors.text }]}>
+                  {selectedCluster.count === 1
+                    ? "1 song at this location"
+                    : `${selectedCluster.count} songs at this location`}
+                </ThemedText>
+                <FlatList
+                  data={selectedCluster.items}
+                  keyExtractor={(item) => `${item.id}-${item.played_at}`}
+                  showsVerticalScrollIndicator={true}
+                  style={styles.trackList}
+                  contentContainerStyle={styles.trackListContent}
+                  renderItem={({ item }) => (
+                    <Pressable
+                      style={styles.trackListItem}
+                      onPress={() => {
+                        setSelectedCluster(null);
+                        router.push(`/song/${item.track.id}` as any);
+                      }}
+                    >
+                      {item.track.album?.image_url ? (
+                        <Image
+                          source={{ uri: item.track.album.image_url }}
+                          style={styles.trackListImage}
+                          cachePolicy="memory-disk"
+                        />
+                      ) : (
+                        <View
+                          style={[
+                            styles.trackListImage,
+                            styles.trackImagePlaceholder,
+                          ]}
+                        >
+                          <MaterialIcons
+                            name="music-note"
+                            size={24}
+                            color="#fff"
+                          />
+                        </View>
+                      )}
+                      <View style={styles.trackListDetails}>
+                        <ThemedText
+                          style={[styles.trackListName, { color: colors.text }]}
+                          numberOfLines={1}
+                        >
+                          {item.track.name}
+                        </ThemedText>
+                        <ThemedText
+                          style={[
+                            styles.trackListArtist,
+                            { color: colors.text },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {item.track.artists.map((a) => a.name).join(", ")}
+                        </ThemedText>
+                        <ThemedText
+                          style={[styles.trackListDate, { color: colors.text }]}
+                        >
+                          {formatDate(item.played_at)}
+                        </ThemedText>
+                      </View>
+                      <MaterialIcons
+                        name="chevron-right"
+                        size={24}
+                        color={colors.icon}
+                      />
+                    </Pressable>
                   )}
-                  <View style={styles.trackDetails}>
-                    <Text
-                      style={[styles.trackName, { color: colors.text }]}
-                      numberOfLines={2}
-                    >
-                      {selectedMarker.track.name}
-                    </Text>
-                    <Text
-                      style={[styles.trackArtist, { color: colors.text }]}
-                      numberOfLines={1}
-                    >
-                      {selectedMarker.track.artists
-                        .map((a) => a.name)
-                        .join(", ")}
-                    </Text>
-                    <Text style={[styles.trackDate, { color: colors.text }]}>
-                      {formatDate(selectedMarker.played_at)}
-                    </Text>
-                  </View>
-                </View>
-                <Pressable
-                  style={[styles.viewTrackButton, { backgroundColor: colors.tint }]}
-                  onPress={() => {
-                    setSelectedMarker(null);
-                    router.push(`/song/${selectedMarker.track.id}` as any);
-                  }}
-                >
-                  <Text style={styles.viewTrackButtonText}>View Track</Text>
-                </Pressable>
+                  ItemSeparatorComponent={() => (
+                    <View
+                      style={[
+                        styles.trackListSeparator,
+                        { backgroundColor: colors.text },
+                      ]}
+                    />
+                  )}
+                />
               </>
             )}
           </View>
@@ -303,7 +369,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingBottom: 12,
-    backgroundColor: "rgba(0,0,0,0.3)",
   },
   headerTitle: {
     fontSize: 18,
@@ -318,36 +383,11 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.2)",
     alignItems: "center",
     justifyContent: "center",
   },
   map: {
     flex: 1,
-  },
-  markerContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    overflow: "hidden",
-    borderWidth: 2,
-    borderColor: "#fff",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  markerImage: {
-    width: "100%",
-    height: "100%",
-  },
-  markerPlaceholder: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: "#538ce9",
-    justifyContent: "center",
-    alignItems: "center",
   },
   statsOverlay: {
     position: "absolute",
@@ -376,7 +416,6 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.5)",
   },
   modalContent: {
     borderTopLeftRadius: 24,
@@ -390,6 +429,13 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     alignSelf: "center",
     marginBottom: 20,
+  },
+  clusterInfo: {
+    fontSize: 14,
+    fontWeight: "600",
+    opacity: 0.7,
+    marginBottom: 12,
+    textAlign: "center",
   },
   trackInfo: {
     flexDirection: "row",
@@ -434,5 +480,43 @@ const styles = StyleSheet.create({
     color: "#000",
     fontSize: 16,
     fontWeight: "600",
+  },
+  trackList: {
+    maxHeight: 400,
+  },
+  trackListContent: {
+    paddingBottom: 8,
+  },
+  trackListItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    gap: 12,
+  },
+  trackListImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 6,
+  },
+  trackListDetails: {
+    flex: 1,
+    gap: 2,
+  },
+  trackListName: {
+    fontSize: 15,
+    fontWeight: "600",
+    fontFamily: Fonts.rounded,
+  },
+  trackListArtist: {
+    fontSize: 13,
+    opacity: 0.7,
+  },
+  trackListDate: {
+    fontSize: 11,
+    opacity: 0.5,
+  },
+  trackListSeparator: {
+    height: 1,
+    opacity: 0.15,
   },
 });

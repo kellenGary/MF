@@ -1,5 +1,16 @@
 import AudioPlayer from "@/components/audio-player";
+import { StyleSheet, View, Text } from "react-native";
 
 export default function PlayerModal() {
-  return <AudioPlayer />;
+  return (
+    <View style={styles.container}>
+      <AudioPlayer />
+    </View>
+  );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+});
