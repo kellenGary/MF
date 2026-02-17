@@ -1,7 +1,6 @@
 import { ThemedText } from '@/components/ui/themed-text';
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Pressable, StyleSheet, View } from "react-native";
 
 interface SongCardProps {
   song: {
@@ -12,9 +11,7 @@ interface SongCardProps {
 }
 
 export default function SongCard({ song, onPress }: SongCardProps) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors } = useTheme();
 
   return (
     <Pressable

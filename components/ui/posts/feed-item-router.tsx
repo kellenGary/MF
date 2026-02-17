@@ -9,22 +9,23 @@ import SharedTrackPost from "./shared-track-post";
 
 interface FeedItemRouterProps {
   item: FeedPost | { type: "ForYou" };
+  onDelete?: (postId: number) => void;
 }
 
-export default function FeedItemRouter({ item }: FeedItemRouterProps) {
+export default function FeedItemRouter({ item, onDelete }: FeedItemRouterProps) {
   switch (item.type) {
     case "ForYou":
       return <ForYouCard />;
     case "SharedTrack":
-      return <SharedTrackPost item={item as FeedPost} />;
+      return <SharedTrackPost item={item as FeedPost} onDelete={onDelete} />;
     case "SharedPlaylist":
-      return <SharedPlaylistPost item={item as FeedPost} />;
+      return <SharedPlaylistPost item={item as FeedPost} onDelete={onDelete} />;
     case "SharedAlbum":
-      return <SharedAlbumPost item={item as FeedPost} />;
+      return <SharedAlbumPost item={item as FeedPost} onDelete={onDelete} />;
     case "SharedArtist":
-      return <SharedArtistPost item={item as FeedPost} />;
+      return <SharedArtistPost item={item as FeedPost} onDelete={onDelete} />;
     case "ListeningSession":
-      return <ListeningSessionPost item={item as FeedPost} />;
+      return <ListeningSessionPost item={item as FeedPost} onDelete={onDelete} />;
     default:
       return null;
   }

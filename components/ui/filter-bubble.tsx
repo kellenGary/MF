@@ -1,6 +1,6 @@
 import { ThemedText } from '@/components/ui/themed-text';
 import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Pressable, StyleSheet } from "react-native";
 
 export default function FilterBubble({
@@ -13,9 +13,7 @@ export default function FilterBubble({
   setActiveFilter: (filter: string) => void;
 }) {
   const isActive = filterName === activeFilter;
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors, isDark } = useTheme();
 
   return (
     <Pressable

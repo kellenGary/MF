@@ -18,22 +18,19 @@ configureReanimatedLogger({
   strict: false,
 });
 
-import { Colors } from "@/constants/theme";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ListeningHistoryProvider } from "@/contexts/ListeningHistoryContext";
 import { LocationProvider } from "@/contexts/LocationContext";
 import { PlaybackProvider } from "@/contexts/playbackContext";
 import { ScrollProvider } from "@/contexts/ScrollContext";
 import * as ThemeContext from "@/contexts/ThemeContext";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { registerBackgroundFetchAsync } from "@/services/backgroundService";
 
 function RootLayoutNav() {
   const { isAuthenticated, isLoading, user } = useAuth();
   const segments = useSegments();
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors, isDark } = ThemeContext.useTheme();
 
   useEffect(() => {
     if (isLoading) return;
@@ -153,13 +150,13 @@ function RootLayoutNav() {
 }
 
 function AppContent() {
-  const colorScheme = useColorScheme();
+  const { isDark } = ThemeContext.useTheme();
 
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       <RootLayoutNav />
       <StatusBar
-        style={colorScheme === "dark" ? "light" : "dark"}
+        style={isDark ? "light" : "dark"}
         translucent
       />
     </ThemeProvider>
@@ -182,6 +179,14 @@ export default function RootLayout() {
           </PlaybackProvider>
         </LocationProvider>
       </AuthProvider>
+      <BackgroundFetchRegistrar />
     </GestureHandlerRootView>
   );
+}
+
+function BackgroundFetchRegistrar() {
+  useEffect(() => {
+    registerBackgroundFetchAsync();
+  }, []);
+  return null;
 }

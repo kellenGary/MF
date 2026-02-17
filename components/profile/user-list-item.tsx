@@ -1,7 +1,7 @@
 import { ThemedText } from "@/components/ui/themed-text";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import followApi from "@/services/followApi";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -34,9 +34,7 @@ export default function UserListItem({
     isFollowing: initialFollowing = false,
     onFollowChange,
 }: UserListItemProps) {
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === "dark";
-    const colors = Colors[isDark ? "dark" : "light"];
+    const { colors, isDark } = useTheme();
     const { user: currentUser } = useAuth();
 
     const [isFollowing, setIsFollowing] = useState(initialFollowing);

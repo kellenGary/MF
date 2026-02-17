@@ -1,6 +1,6 @@
 import { ThemedText } from '@/components/ui/themed-text';
 import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
@@ -35,9 +35,7 @@ export default function SOTDProfile({
   track,
   isOwnProfile = false,
 }: SOTDProfileProps) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors, isDark } = useTheme();
 
   const translateY = useSharedValue(0);
 

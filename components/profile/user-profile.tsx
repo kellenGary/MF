@@ -1,7 +1,6 @@
-import { Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useScrollContext } from "@/contexts/ScrollContext";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import useTrackStreaks from "@/hooks/useTrackStreaks";
 import useUserContent from "@/hooks/useUserContent";
 import profileApi, { ProfileData } from "@/services/profileApi";
@@ -52,9 +51,7 @@ export default function UserProfile({ userId }: UserProfileProps) {
   const insets = useSafeAreaInsets();
   const { isAuthenticated, profileData: cachedProfileData } = useAuth();
   const { collapse } = useScrollContext();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors } = useTheme();
 
   // Profile-specific state
   const [profileData, setProfileData] = useState<ProfileData | null>(userId ? null : cachedProfileData);

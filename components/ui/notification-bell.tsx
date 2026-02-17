@@ -1,5 +1,4 @@
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import React, { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -21,9 +20,7 @@ interface NotificationBellProps {
 }
 
 export default function NotificationBell({ count = 0, onPress }: NotificationBellProps) {
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === 'dark';
-    const colors = Colors[isDark ? 'dark' : 'light'];
+    const { colors } = useTheme();
 
     const rotation = useSharedValue(0);
 

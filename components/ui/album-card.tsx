@@ -1,7 +1,6 @@
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import { Pressable, StyleSheet, View } from "react-native";
 import { ThemedText } from "@/components/ui/themed-text";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Pressable, StyleSheet, View } from "react-native";
 
 interface AlbumCardProps {
   album: {
@@ -12,9 +11,7 @@ interface AlbumCardProps {
 }
 
 export default function AlbumCard({ album, onPress }: AlbumCardProps) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors } = useTheme();
 
   return (
     <Pressable

@@ -1,7 +1,6 @@
 import FeedItemRouter from "@/components/ui/posts/feed-item-router";
-import { Colors } from "@/constants/theme";
 import { useScrollContext } from "@/contexts/ScrollContext";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import useFeed from "@/hooks/useFeed";
 import React, { useCallback } from "react";
 import {
@@ -17,12 +16,10 @@ type FeedProps = {
 };
 
 export default function Feed({ ListHeaderComponent = null }: FeedProps) {
-  const { feedPosts, feedLoading, refreshing, handleRefresh, handleLoadMore } =
+  const { feedPosts, feedLoading, refreshing, handleRefresh, handleLoadMore, handleDeletePost } =
     useFeed();
   const { collapse } = useScrollContext();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors } = useTheme();
 
   const handleScrollBeginDrag = useCallback(() => {
     collapse();
@@ -46,7 +43,7 @@ export default function Feed({ ListHeaderComponent = null }: FeedProps) {
   return (
     <FlatList
       data={feedPosts}
-      renderItem={({ item }) => <FeedItemRouter item={item} />}
+      renderItem={({ item }) => <FeedItemRouter item={item} onDelete={handleDeletePost} />}
       keyExtractor={(item: any) => `${item.type}-${item.id}-${item.createdAt}`}
       ListHeaderComponent={() => <>{ListHeaderComponent}</>}
       ListFooterComponent={renderFooter}

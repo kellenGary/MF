@@ -1,6 +1,6 @@
 import { ThemedText } from '@/components/ui/themed-text';
 import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Dispatch, SetStateAction } from "react";
 import { Pressable, StyleSheet } from "react-native";
 
@@ -15,9 +15,7 @@ export default function TabNavigation({
   activeTab: TabType;
   setActiveTab: Dispatch<SetStateAction<TabType>>;
 }) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors } = useTheme();
 
   return (
     <>

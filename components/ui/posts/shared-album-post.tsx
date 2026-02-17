@@ -1,23 +1,26 @@
 import { useAuth } from "@/contexts/AuthContext";
 import feedApi, { FeedPost } from "@/services/feedApi";
+import { MaterialIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React from "react";
-import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 
 interface SharedAlbumPostProps {
   item: FeedPost;
+  onDelete?: (postId: number) => void;
 }
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
-export default function SharedAlbumPost({ item }: SharedAlbumPostProps) {
+export default function SharedAlbumPost({ item, onDelete }: SharedAlbumPostProps) {
   const { user: currentUser } = useAuth();
 
   const timeAgo = feedApi.getTimeAgo(item.createdAt);
   const album = item.album;
   const user = item.user;
+  const isOwnPost = currentUser?.id === user.id;
 
   if (!album) return null;
 
@@ -27,6 +30,29 @@ export default function SharedAlbumPost({ item }: SharedAlbumPostProps) {
 
   const handleProfilePress = () => {
     router.push(`/profile/${user.id === currentUser?.id ? "" : user.id}`);
+  };
+
+  const handleDelete = () => {
+    if (!onDelete) return;
+    Alert.alert(
+      "Delete Post",
+      "Are you sure you want to delete this post?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await feedApi.deletePost(item.id);
+              onDelete(item.id);
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete post. Please try again.");
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -61,6 +87,11 @@ export default function SharedAlbumPost({ item }: SharedAlbumPostProps) {
               </Text>
             </View>
           </Pressable>
+          {isOwnPost && onDelete && (
+            <Pressable hitSlop={8} onPress={handleDelete} style={styles.deleteButton}>
+              <MaterialIcons name="delete-outline" size={22} color="rgba(255,255,255,0.8)" />
+            </Pressable>
+          )}
         </View>
 
         {/* Centered Album Art */}
@@ -117,6 +148,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     zIndex: 10,
   },
   headerRow: {
@@ -202,5 +234,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "500",
     color: "rgba(255,255,255,0.9)",
+  },
+  deleteButton: {
+    opacity: 0.8,
   },
 });

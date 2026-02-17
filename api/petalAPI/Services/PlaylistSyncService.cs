@@ -81,8 +81,8 @@ public class PlaylistSyncService : IPlaylistSyncService
                 
                 // Get track count
                 int? trackCount = null;
-                if (spotifyPlaylist.TryGetProperty("items", out var itemsObj) && 
-                    itemsObj.TryGetProperty("total", out var totalProp))
+                if (spotifyPlaylist.TryGetProperty("tracks", out var tracksObj) && 
+                    tracksObj.TryGetProperty("total", out var totalProp))
                 {
                     trackCount = totalProp.GetInt32();
                 }
@@ -366,6 +366,13 @@ public class PlaylistSyncService : IPlaylistSyncService
             var url = $"https://api.spotify.com/v1/playlists/{playlistId}/tracks?limit={limit}&offset={offset}";
             var response = await client.GetAsync(url);
 
+            if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            {
+                _logger.LogWarning("[PlaylistSync] Rate limited fetching tracks for playlist {PlaylistId}. Waiting 5s...", playlistId);
+                await Task.Delay(5000);
+                response = await client.GetAsync(url);
+            }
+
             if (!response.IsSuccessStatusCode)
             {
                 var error = await response.Content.ReadAsStringAsync();
@@ -387,6 +394,9 @@ public class PlaylistSyncService : IPlaylistSyncService
             var total = data.TryGetProperty("total", out var totalProp) ? totalProp.GetInt32() : 0;
             offset += limit;
             hasMore = offset < total;
+            
+            // Respect rate limits during pagination
+            await Task.Delay(100);
         }
 
         return allTracks;

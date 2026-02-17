@@ -1,7 +1,6 @@
 import { ThemedText } from '@/components/ui/themed-text';
-import { Colors } from "@/constants/theme";
 import { usePlayback } from "@/contexts/playbackContext";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import playbackApi from "@/services/playbackApi";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
@@ -29,10 +28,8 @@ export default function SongItem({
   link,
   streak,
 }: SongItemProps) {
-  const colorScheme = useColorScheme();
+  const { colors } = useTheme();
   const { playbackState } = usePlayback();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
 
   const isActive =
     playbackState?.item?.name === title && playbackState?.isPlaying;

@@ -1,6 +1,6 @@
 import { ThemedText } from '@/components/ui/themed-text';
 import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import followApi from "@/services/followApi";
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet } from "react-native";
@@ -14,9 +14,7 @@ export default function FollowButton({
   userId,
   onFollowChange,
 }: FollowButtonProps) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors, isDark } = useTheme();
 
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);

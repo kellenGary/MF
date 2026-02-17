@@ -1,6 +1,6 @@
 import { ThemedText } from '@/components/ui/themed-text';
-import { Colors } from "@/constants/theme";
 import { usePlayback } from "@/contexts/playbackContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import spotifyApi from "@/services/spotifyApi";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -11,9 +11,7 @@ import {
   Dimensions,
   Pressable,
   StyleSheet,
-  Text,
-  useColorScheme,
-  View,
+  View
 } from "react-native";
 
 const { width, height } = Dimensions.get("window");
@@ -31,9 +29,7 @@ export default function AudioPlayer() {
     toggleRepeat,
   } = usePlayback();
 
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors } = useTheme();
 
   const track = playbackState?.item;
   const imageUrl = track?.album?.images?.[0]?.url;

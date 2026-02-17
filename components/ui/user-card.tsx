@@ -1,6 +1,6 @@
 import { ThemedText } from '@/components/ui/themed-text';
 import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Image } from "expo-image";
 import { RelativePathString, router } from "expo-router";
 import {
@@ -37,9 +37,7 @@ export default function UserCard({
   isLoading,
   onToggleFollow,
 }: UserCardProps) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors } = useTheme();
 
   const handleOpenProfile = (userId: string) => {
     router.push(`/profile/${userId}` as RelativePathString);

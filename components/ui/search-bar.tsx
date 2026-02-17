@@ -1,5 +1,4 @@
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Pressable, StyleSheet, TextInput, View, ViewStyle } from "react-native";
 
@@ -18,9 +17,7 @@ export default function SearchBar({
     containerStyle,
     autoFocus = false,
 }: SearchBarProps) {
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === "dark";
-    const colors = Colors[isDark ? "dark" : "light"];
+    const { colors } = useTheme();
 
     return (
         <View

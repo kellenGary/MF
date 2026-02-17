@@ -1,7 +1,6 @@
-import { Colors } from '@/constants/theme';
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlayback } from "@/contexts/playbackContext";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import {
@@ -17,9 +16,7 @@ export default function MiniPlayer() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { playbackState, currentProgressMs } = usePlayback();
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors, isDark } = useTheme();
 
   // Handle press to open full player
   const handlePress = () => {

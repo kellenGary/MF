@@ -1,12 +1,10 @@
 import { ThemedText } from '@/components/ui/themed-text';
-import { ScrollView, Text, View, Image, StyleSheet } from "react-native";
 import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Image, ScrollView, StyleSheet, View } from "react-native";
 
 export default function LiveListeners() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors } = useTheme();
 
   return (
     <View style={styles.activeContainer}>
@@ -39,7 +37,7 @@ export default function LiveListeners() {
 }
 
 const styles = StyleSheet.create({
-      activeContainer: {
+  activeContainer: {
     width: "100%",
   },
   activeScrollView: {

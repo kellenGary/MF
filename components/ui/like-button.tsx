@@ -1,5 +1,4 @@
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useEffect } from "react";
 import { Pressable, StyleSheet, Text } from "react-native";
@@ -24,9 +23,7 @@ export default function LikeButton({
   likeLoading,
   handleToggleLike,
 }: LikeButtonProps) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors } = useTheme();
 
   const scale = useSharedValue(1);
   const textTranslateX = useSharedValue(0);

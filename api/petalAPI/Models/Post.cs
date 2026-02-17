@@ -58,6 +58,7 @@ public class Post
     public ListeningSession? ListeningSession { get; set; }
 
     public DateTime CreatedAt { get; set; }
+    public DateTime? DeletedAt { get; set; }
     public PostVisibility Visibility { get; set; }
 
     /// <summary>

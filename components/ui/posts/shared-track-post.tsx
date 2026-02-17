@@ -1,7 +1,6 @@
 import { ThemedText } from '@/components/ui/themed-text';
-import { Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import feedApi, { FeedPost } from "@/services/feedApi";
 import { Image } from "expo-image";
 import { router } from "expo-router";
@@ -11,14 +10,13 @@ import PostHeader from "./post-header";
 
 interface SharedTrackPostProps {
   item: FeedPost;
+  onDelete?: (postId: number) => void;
 }
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
-export default function SharedTrackPost({ item }: SharedTrackPostProps) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+export default function SharedTrackPost({ item, onDelete }: SharedTrackPostProps) {
+  const { colors } = useTheme();
   const { user: currentUser } = useAuth();
 
   const timeAgo = feedApi.getTimeAgo(item.createdAt);
@@ -38,7 +36,16 @@ export default function SharedTrackPost({ item }: SharedTrackPostProps) {
 
   return (
     <Pressable style={styles.container} onPress={handlePress}>
-      <PostHeader user={item.user} timeAgo={timeAgo} />
+      <PostHeader
+        user={item.user}
+        timeAgo={timeAgo}
+        postId={item.id}
+        onDelete={onDelete}
+        initialLiked={item.isLiked}
+        initialLikeCount={item.likeCount}
+        initialReposted={item.isReposted}
+        initialRepostCount={item.repostCount}
+      />
 
       {caption && (
         <ThemedText style={[styles.caption, { color: colors.text }]}>{caption}</ThemedText>

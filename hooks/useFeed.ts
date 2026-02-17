@@ -120,6 +120,10 @@ export default function useFeed() {
     }
   }, [feedLoading, hasMorePosts, fetchFeedPosts]);
 
+  const handleDeletePost = useCallback((postId: number) => {
+    setFeedPosts((prev) => prev.filter((p) => p.id !== postId));
+  }, []);
+
   useEffect(() => {
     fetchFeedPosts(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -136,6 +140,7 @@ export default function useFeed() {
     refreshing,
     handleRefresh,
     handleLoadMore,
+    handleDeletePost,
     hasMorePosts,
   } as const;
 }

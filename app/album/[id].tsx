@@ -16,9 +16,9 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  useColorScheme,
   View,
 } from "react-native";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const ALBUM_COVER_SIZE = 180;

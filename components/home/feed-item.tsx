@@ -1,17 +1,14 @@
 import { ThemedText } from '@/components/ui/themed-text';
-import { Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import feedApi, { FeedPost } from "@/services/feedApi";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import React, { useCallback } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 
 export default function FeedItem({ item }: { item: FeedPost }) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors, isDark } = useTheme();
   const { user } = useAuth();
 
   const imageUrl = feedApi.getPostImageUrl(item);

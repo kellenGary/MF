@@ -1,11 +1,11 @@
 import { ThemedText } from '@/components/ui/themed-text';
 import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import { FeedTrack } from "@/services/feedApi";
 import { Image } from "expo-image";
 import { router } from 'expo-router';
 import React from "react";
-import { Dimensions, Pressable, StyleSheet, View } from "react-native";
+import { Dimensions, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
     Extrapolation,
@@ -23,6 +23,48 @@ const CARD_WIDTH = 280;
 const CARD_HEIGHT = 350;
 const CARD_OVERLAP = 50;
 
+// --- Grouped item types ---
+
+type CarouselItem =
+    | { type: 'track'; track: FeedTrack }
+    | { type: 'album'; albumName: string; albumImageUrl: string | null; tracks: FeedTrack[] };
+
+/**
+ * Groups consecutive tracks that share the same albumName into album items.
+ * Solo tracks (no consecutive neighbour with the same album) stay as individual track items.
+ */
+function groupTracks(tracks: FeedTrack[]): CarouselItem[] {
+    const items: CarouselItem[] = [];
+    let i = 0;
+
+    while (i < tracks.length) {
+        const current = tracks[i];
+        // Collect consecutive tracks with the same album
+        let j = i + 1;
+        while (j < tracks.length && tracks[j].albumName && tracks[j].albumName === current.albumName) {
+            j++;
+        }
+
+        const count = j - i;
+        if (count >= 2 && current.albumName) {
+            // Group into an album card
+            items.push({
+                type: 'album',
+                albumName: current.albumName,
+                albumImageUrl: current.albumImageUrl,
+                tracks: tracks.slice(i, j),
+            });
+        } else {
+            // Single track
+            items.push({ type: 'track', track: current });
+        }
+
+        i = j;
+    }
+
+    return items;
+}
+
 export interface TrackCarouselProps {
     tracks: FeedTrack[];
     /** Optional callback when a track is pressed. If not provided, navigates to /song/{id} */
@@ -30,16 +72,15 @@ export interface TrackCarouselProps {
 }
 
 export default function TrackCarousel({ tracks, onTrackPress }: TrackCarouselProps) {
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === "dark";
-    const colors = Colors[isDark ? "dark" : "light"];
+    const { colors } = useTheme();
 
     const scrollOffset = useSharedValue(0);
     const savedOffset = useSharedValue(0);
 
     if (!tracks || tracks.length === 0) return null;
 
-    const maxOffset = Math.max(0, (tracks.length - 1) * CARD_OVERLAP);
+    const items = groupTracks(tracks);
+    const maxOffset = Math.max(0, (items.length - 1) * CARD_OVERLAP);
 
     const panGesture = Gesture.Pan()
         .activeOffsetX([-10, 10])
@@ -58,7 +99,7 @@ export default function TrackCarousel({ tracks, onTrackPress }: TrackCarouselPro
             const velocity = -event.velocityX;
             const projectedOffset = scrollOffset.value + velocity * 0.1;
             const nearestCard = Math.round(projectedOffset / CARD_OVERLAP);
-            const clampedCard = Math.max(0, Math.min(nearestCard, tracks.length - 1));
+            const clampedCard = Math.max(0, Math.min(nearestCard, items.length - 1));
             const targetOffset = clampedCard * CARD_OVERLAP;
 
             scrollOffset.value = withSpring(targetOffset, {
@@ -81,40 +122,47 @@ export default function TrackCarousel({ tracks, onTrackPress }: TrackCarouselPro
         <GestureDetector gesture={panGesture}>
             <View style={styles.carouselContainer}>
                 <View style={styles.carouselTrack}>
-                    {tracks.map((track, index) => (
-                        <StackedCard
-                            key={`${track.spotifyId}-${index}`}
-                            track={track}
-                            index={index}
-                            totalCards={tracks.length}
-                            scrollOffset={scrollOffset}
-                            colors={colors}
-                            onPress={() => handleTrackPress(track, index)}
-                        />
-                    ))}
+                    {items.map((item, index) => {
+                        if (item.type === 'album') {
+                            return (
+                                <StackedAlbumCard
+                                    key={`album-${item.albumName}-${index}`}
+                                    albumName={item.albumName}
+                                    albumImageUrl={item.albumImageUrl}
+                                    albumTracks={item.tracks.reverse()}
+                                    index={index}
+                                    totalCards={items.length}
+                                    scrollOffset={scrollOffset}
+                                    colors={colors}
+                                    onTrackPress={(track) => handleTrackPress(track, index)}
+                                />
+                            );
+                        }
+                        return (
+                            <StackedCard
+                                key={`${item.track.spotifyId}-${index}`}
+                                track={item.track}
+                                index={index}
+                                totalCards={items.length}
+                                scrollOffset={scrollOffset}
+                                colors={colors}
+                                onPress={() => handleTrackPress(item.track, index)}
+                            />
+                        );
+                    })}
                 </View>
             </View>
         </GestureDetector>
     );
 }
 
-interface StackedCardProps {
-    track: FeedTrack;
-    index: number;
-    totalCards: number;
-    scrollOffset: SharedValue<number>;
-    colors: typeof Colors.light;
-    onPress: () => void;
-}
+// ----- Shared animation hook -----
 
-function StackedCard({
-    track,
-    index,
-    totalCards,
-    scrollOffset,
-    colors,
-    onPress,
-}: StackedCardProps) {
+function useStackedAnimation(
+    index: number,
+    totalCards: number,
+    scrollOffset: SharedValue<number>,
+) {
     const centerOffset = useDerivedValue(() => {
         const basePosition = index * CARD_OVERLAP;
         const relativePosition = basePosition - scrollOffset.value;
@@ -154,24 +202,46 @@ function StackedCard({
         };
     });
 
-    // Animated opacity for text - fades in when card is focused
     const textAnimatedStyle = useAnimatedStyle(() => {
         const absoluteCenterOffset = Math.abs(centerOffset.value);
-
-        // Text is fully visible when centered (offset = 0), fades out as it moves away
         const opacity = interpolate(
             absoluteCenterOffset,
             [0, 0.3, 0.5],
             [1, 0.5, 0],
             Extrapolation.CLAMP
         );
-
-        return {
-            opacity,
-        };
+        return { opacity };
     });
 
     const isCentered = () => Math.abs(centerOffset.value) < 0.1;
+
+    return { animatedStyle, textAnimatedStyle, isCentered };
+}
+
+// ----- Single Track Card -----
+
+interface StackedCardProps {
+    track: FeedTrack;
+    index: number;
+    totalCards: number;
+    scrollOffset: SharedValue<number>;
+    colors: typeof Colors.light;
+    onPress: () => void;
+}
+
+function StackedCard({
+    track,
+    index,
+    totalCards,
+    scrollOffset,
+    colors,
+    onPress,
+}: StackedCardProps) {
+    const { animatedStyle, textAnimatedStyle, isCentered } = useStackedAnimation(
+        index,
+        totalCards,
+        scrollOffset,
+    );
 
     const handlePress = () => {
         if (isCentered()) {
@@ -212,6 +282,92 @@ function StackedCard({
     );
 }
 
+// ----- Album Group Card -----
+
+interface StackedAlbumCardProps {
+    albumName: string;
+    albumImageUrl: string | null;
+    albumTracks: FeedTrack[];
+    index: number;
+    totalCards: number;
+    scrollOffset: SharedValue<number>;
+    colors: typeof Colors.light;
+    onTrackPress: (track: FeedTrack) => void;
+}
+
+function StackedAlbumCard({
+    albumName,
+    albumImageUrl,
+    albumTracks,
+    index,
+    totalCards,
+    scrollOffset,
+    colors,
+    onTrackPress,
+}: StackedAlbumCardProps) {
+    const { animatedStyle, textAnimatedStyle, isCentered } = useStackedAnimation(
+        index,
+        totalCards,
+        scrollOffset,
+    );
+
+    return (
+        <Animated.View style={[styles.stackedCard, animatedStyle]}>
+            <View style={[styles.cardInner, { backgroundColor: colors.card }]}>
+                {albumImageUrl && (
+                    <Image
+                        source={{ uri: albumImageUrl }}
+                        style={styles.albumCardImage}
+                    />
+                )}
+                <View style={[styles.albumCardContent, { backgroundColor: colors.card }]}>
+                    <Animated.View style={[textAnimatedStyle, { flex: 1 }]}>
+                        <ThemedText
+                            style={[styles.albumCardTitle, { color: colors.text }]}
+                            numberOfLines={1}
+                        >
+                            {albumName}
+                        </ThemedText>
+                        <ThemedText
+                            style={[styles.cardArtistName, { color: colors.text }]}
+                            numberOfLines={1}
+                        >
+                            {albumTracks[0]?.artistNames?.join(', ') || 'Unknown Artist'}
+                        </ThemedText>
+                        <ScrollView
+                            style={styles.tracklistScroll}
+                            nestedScrollEnabled
+                            showsVerticalScrollIndicator={false}
+                        >
+                            {albumTracks.map((t, i) => (
+                                <Pressable
+                                    key={`${t.spotifyId}-${i}`}
+                                    style={styles.tracklistRow}
+                                    onPress={() => {
+                                        if (isCentered()) onTrackPress(t);
+                                    }}
+                                >
+                                    <ThemedText
+                                        style={[styles.tracklistNumber, { color: colors.text }]}
+                                    >
+                                        {i + 1}
+                                    </ThemedText>
+                                    <ThemedText
+                                        style={[styles.tracklistName, { color: colors.text }]}
+                                        numberOfLines={1}
+                                    >
+                                        {t.name || 'Unknown Track'}
+                                    </ThemedText>
+                                </Pressable>
+                            ))}
+                        </ScrollView>
+                    </Animated.View>
+                </View>
+            </View>
+        </Animated.View>
+    );
+}
+
 const styles = StyleSheet.create({
     carouselContainer: {
         height: CARD_HEIGHT + 40,
@@ -245,6 +401,7 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 8,
     },
+    // --- Single track card ---
     cardImage: {
         width: CARD_WIDTH,
         aspectRatio: 1,
@@ -261,5 +418,41 @@ const styles = StyleSheet.create({
     cardArtistName: {
         fontSize: 12,
         opacity: 0.6,
+    },
+    // --- Album group card ---
+    albumCardImage: {
+        width: CARD_WIDTH,
+        height: 140,
+        resizeMode: "cover",
+    },
+    albumCardContent: {
+        flex: 1,
+        padding: 12,
+    },
+    albumCardTitle: {
+        fontSize: 15,
+        fontWeight: "800",
+        marginBottom: 2,
+    },
+    tracklistScroll: {
+        marginTop: 8,
+        flex: 1,
+    },
+    tracklistRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingVertical: 4,
+        gap: 8,
+    },
+    tracklistNumber: {
+        fontSize: 12,
+        opacity: 0.4,
+        width: 18,
+        textAlign: "right",
+    },
+    tracklistName: {
+        fontSize: 13,
+        fontWeight: "500",
+        flex: 1,
     },
 });

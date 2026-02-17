@@ -1,14 +1,13 @@
 import { ThemedText } from "@/components/ui/themed-text";
+import TrackList, { ListItem } from "@/components/ui/track-list";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import listeningHistoryApi, { UniqueTrack } from "@/services/listeningHistoryApi";
 import { Ionicons } from "@expo/vector-icons";
-import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
-    FlatList,
     Pressable,
     StyleSheet,
     TextInput,
@@ -67,7 +66,6 @@ export default function UniqueSongsScreen() {
             } else {
                 setTracks((prev) => [...prev, ...data.items]);
             }
-            console.log(JSON.stringify(data.items[0]))
             setHasMore(data.items.length === PAGE_SIZE);
         } catch (error) {
             console.error("Error fetching unique tracks:", error);
@@ -86,28 +84,16 @@ export default function UniqueSongsScreen() {
         }
     };
 
-    const renderItem = useCallback(({ item }: { item: UniqueTrack }) => {
-        // Debug logging for image URL issue
-        // console.log("Render Item:", JSON.stringify(item, null, 2)); 
-        return (
-            <View style={[styles.trackItem, { borderBottomColor: colors.border }]}>
-                <Image
-                    source={{ uri: item.album?.imageUrl }}
-                    style={styles.albumArt}
-                    contentFit="cover"
-                    transition={200}
-                />
-                <View style={styles.trackInfo}>
-                    <ThemedText style={styles.trackName} numberOfLines={1}>
-                        {item.name}
-                    </ThemedText>
-                    <ThemedText style={styles.artistName} numberOfLines={1}>
-                        {item.artists.map((a: any) => a.name).join(", ")}
-                    </ThemedText>
-                </View>
-            </View>
-        );
-    }, [colors.border]);
+    const trackListItems: ListItem[] = useMemo(
+        () =>
+            tracks.map((t) => ({
+                id: `${t.id}_${t.played_at}`,
+                name: t.name,
+                subtitle: t.artists.map((a: any) => a.name).join(", "),
+                imageUrl: t.album?.imageUrl,
+            })),
+        [tracks],
+    );
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
@@ -153,25 +139,14 @@ export default function UniqueSongsScreen() {
                     <ActivityIndicator size="large" color={colors.tint} />
                 </View>
             ) : (
-                <FlatList
-                    data={tracks}
-                    renderItem={renderItem}
-                    keyExtractor={(item) => item.id.toString() + "_" + item.played_at} // unique key
+                <TrackList
+                    items={trackListItems}
                     onEndReached={handleLoadMore}
-                    onEndReachedThreshold={0.5}
-                    ListFooterComponent={
-                        isLoadingMore ? (
-                            <ActivityIndicator size="small" color={colors.tint} style={{ margin: 20 }} />
-                        ) : null
-                    }
-                    ListEmptyComponent={
-                        !isLoading ? (
-                            <View style={styles.centerContainer}>
-                                <ThemedText>No songs found</ThemedText>
-                            </View>
-                        ) : null
-                    }
-                    contentContainerStyle={{ paddingBottom: insets.bottom }}
+                    isLoadingMore={isLoadingMore}
+                    emptyMessage="No songs found"
+                    flatListProps={{
+                        contentContainerStyle: { paddingBottom: insets.bottom },
+                    }}
                 />
             )}
         </View>
@@ -224,31 +199,5 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
     },
-    trackItem: {
-        flexDirection: "row",
-        alignItems: "center",
-        padding: 12,
-        paddingHorizontal: 16,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-    },
-    albumArt: {
-        width: 50,
-        height: 50,
-        borderRadius: 4,
-        backgroundColor: "#E1E1E1",
-    },
-    trackInfo: {
-        flex: 1,
-        marginLeft: 12,
-        justifyContent: "center",
-    },
-    trackName: {
-        fontSize: 16,
-        fontWeight: "600",
-        marginBottom: 4,
-    },
-    artistName: {
-        fontSize: 14,
-        opacity: 0.7,
-    },
 });
+

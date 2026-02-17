@@ -1,6 +1,5 @@
 import { ThemedText } from "@/components/ui/themed-text";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import { ProfileData } from "@/services/profileApi";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Image } from "expo-image";
@@ -24,9 +23,7 @@ export default function ProfileHeader({
     userId,
     onFollowChange,
 }: ProfileHeaderProps) {
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === "dark";
-    const colors = Colors[isDark ? "dark" : "light"];
+    const { colors } = useTheme();
 
     return (
         <>

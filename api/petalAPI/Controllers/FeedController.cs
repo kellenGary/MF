@@ -61,6 +61,7 @@ public class FeedController : ControllerBase
         // Build the query for posts
         var query = _context.Posts
             .Where(p => followedUserIds.Contains(p.UserId))
+            .Where(p => p.DeletedAt == null)
             .Where(p => p.Visibility == PostVisibility.Public || 
                        (p.Visibility == PostVisibility.Followers && followedUserIds.Contains(p.UserId)));
 
@@ -144,7 +145,9 @@ public class FeedController : ControllerBase
                     DisplayName = p.OriginalPost.User.DisplayName,
                     Handle = p.OriginalPost.User.Handle,
                     ProfileImageUrl = p.OriginalPost.User.ProfileImageUrl
-                } : null
+                } : null,
+                IsLiked = p.Likes.Any(l => l.UserId == currentUserId.Value),
+                IsReposted = _context.Reposts.Any(r => r.OriginalPostId == p.Id && r.UserId == currentUserId.Value)
             })
             .ToListAsync();
 
@@ -185,7 +188,8 @@ public class FeedController : ControllerBase
 
         // Build query
         var query = _context.Posts
-            .Where(p => p.UserId == userId);
+            .Where(p => p.UserId == userId)
+            .Where(p => p.DeletedAt == null);
 
         // Apply visibility filter
         if (!isOwnProfile)
@@ -273,7 +277,9 @@ public class FeedController : ControllerBase
                     DisplayName = p.OriginalPost.User.DisplayName,
                     Handle = p.OriginalPost.User.Handle,
                     ProfileImageUrl = p.OriginalPost.User.ProfileImageUrl
-                } : null
+                } : null,
+                IsLiked = p.Likes.Any(l => l.UserId == currentUserId.Value),
+                IsReposted = _context.Reposts.Any(r => r.OriginalPostId == p.Id && r.UserId == currentUserId.Value)
             })
             .ToListAsync();
 
@@ -312,6 +318,8 @@ public class FeedPostDto
     public int RepostCount { get; set; }
     public int? OriginalPostId { get; set; }
     public FeedUserDto? OriginalPostUser { get; set; }
+    public bool IsLiked { get; set; }
+    public bool IsReposted { get; set; }
 }
 
 public class FeedUserDto

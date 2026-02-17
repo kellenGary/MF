@@ -1,6 +1,6 @@
 import { ThemedText } from "@/components/ui/themed-text";
 import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
 import { router } from "expo-router";
@@ -24,9 +24,7 @@ export default function SotdSuggestionPopup({
 }: SotdSuggestionPopupProps) {
     const { height } = useWindowDimensions();
     const insets = useSafeAreaInsets();
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === "dark";
-    const colors = Colors[isDark ? "dark" : "light"];
+    const { colors, isDark } = useTheme();
 
     const handlePickSong = () => {
         onDismiss();

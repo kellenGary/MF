@@ -1,18 +1,15 @@
 import { RelativePathString } from "@/.expo/types/router";
-import { ScrollView } from "react-native";
-import { Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
-import { useColorScheme } from "@/hooks/use-color-scheme.web";
+import { useTheme } from "@/contexts/ThemeContext";
 import listeningHistoryApi from "@/services/listeningHistoryApi";
 import { useCallback, useEffect, useState } from "react";
+import { ScrollView } from "react-native";
 import SongItem from "../song-item";
 const PAGE_SIZE = 50;
 
 export default function RecentlyPlayedTracks() {
   const { isAuthenticated } = useAuth();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors } = useTheme();
   const [historyData, setHistoryData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -71,20 +68,20 @@ export default function RecentlyPlayedTracks() {
       {!historyData
         ? null
         : (historyData.items || []).map((group: any, index: number) => {
-            const track = group.track;
-            return (
-              <SongItem
-                key={`${track.id}-${index}`}
-                id={track.id}
-                title={track.name}
-                artist={track.artists
-                  .map((artist: any) => artist.name)
-                  .join(", ")}
-                cover={group.track.album.image_url}
-                link={`/song/${track.id}` as RelativePathString}
-              />
-            );
-          })}
+          const track = group.track;
+          return (
+            <SongItem
+              key={`${track.id}-${index}`}
+              id={track.id}
+              title={track.name}
+              artist={track.artists
+                .map((artist: any) => artist.name)
+                .join(", ")}
+              cover={group.track.album.image_url}
+              link={`/song/${track.id}` as RelativePathString}
+            />
+          );
+        })}
     </ScrollView>
   );
 }

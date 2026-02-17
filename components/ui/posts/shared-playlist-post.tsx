@@ -1,6 +1,6 @@
 import { ThemedText } from '@/components/ui/themed-text';
 import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import feedApi, { FeedPost } from "@/services/feedApi";
 import { Image } from "expo-image";
 import React from "react";
@@ -9,12 +9,11 @@ import PostHeader from "./post-header";
 
 interface SharedPlaylistPostProps {
   item: FeedPost;
+  onDelete?: (postId: number) => void;
 }
 
-export default function SharedPlaylistPost({ item }: SharedPlaylistPostProps) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+export default function SharedPlaylistPost({ item, onDelete }: SharedPlaylistPostProps) {
+  const { colors } = useTheme();
 
   const timeAgo = feedApi.getTimeAgo(item.createdAt);
   const caption = feedApi.getCaption(item);
@@ -31,7 +30,16 @@ export default function SharedPlaylistPost({ item }: SharedPlaylistPostProps) {
         /* Navigate to playlist */
       }}
     >
-      <PostHeader user={item.user} timeAgo={timeAgo} />
+      <PostHeader
+        user={item.user}
+        timeAgo={timeAgo}
+        postId={item.id}
+        onDelete={onDelete}
+        initialLiked={item.isLiked}
+        initialLikeCount={item.likeCount}
+        initialReposted={item.isReposted}
+        initialRepostCount={item.repostCount}
+      />
 
       {caption && (
         <ThemedText style={[styles.caption, { color: colors.text }]}>{caption}</ThemedText>

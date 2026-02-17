@@ -73,6 +73,8 @@ export interface FeedPost {
   repostCount: number;
   originalPostId: number | null;
   originalPostUser: FeedUser | null;
+  isLiked: boolean;
+  isReposted: boolean;
 }
 
 export interface FeedListeningSessionPost extends FeedPost {
@@ -309,6 +311,8 @@ class FeedApiService {
   isLikedPost(type: PostType): boolean {
     return ["LikedTrack", "LikedAlbum", "LikedPlaylist"].includes(type);
   }
+
+  // Duplicate methods removed. Using robust implementations below.
 
   /**
    * Helper to format the time since a post was created

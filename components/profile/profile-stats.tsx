@@ -1,6 +1,5 @@
 import { ThemedText } from "@/components/ui/themed-text";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import { ProfileData } from "@/services/profileApi";
 import { Image } from "expo-image";
 import { RelativePathString, router, useFocusEffect } from "expo-router";
@@ -29,9 +28,7 @@ export default function ProfileStats({
     formatNumber,
     userId,
 }: ProfileStatsProps) {
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === "dark";
-    const colors = Colors[isDark ? "dark" : "light"];
+    const { colors } = useTheme();
 
     const effectiveUserId = userId ?? profileData?.id;
 

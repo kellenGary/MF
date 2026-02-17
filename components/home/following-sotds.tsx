@@ -1,6 +1,6 @@
 import { ThemedText } from '@/components/ui/themed-text';
 import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import sotdApi, { FollowingSotdItem } from "@/services/sotdApi";
 import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
@@ -19,9 +19,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 export default function FollowingSotds() {
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === "dark";
-    const colors = Colors[isDark ? "dark" : "light"];
+    const { colors, isDark } = useTheme();
 
     const [sotds, setSotds] = useState<FollowingSotdItem[]>([]);
     const [loading, setLoading] = useState(true);

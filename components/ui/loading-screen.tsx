@@ -1,6 +1,6 @@
 import { ThemedText } from '@/components/ui/themed-text';
 import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 interface LoadingScreenProps {
@@ -13,9 +13,7 @@ interface LoadingScreenProps {
  * Automatically adapts to light/dark theme.
  */
 export default function LoadingScreen({ message }: LoadingScreenProps) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors } = useTheme();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

@@ -1,6 +1,6 @@
 import { ThemedText } from "@/components/ui/themed-text";
 import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import recommendationApi, { Recommendation } from "@/services/recommendationApi";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -31,9 +31,7 @@ interface ForYouCardProps {
  * Tracks dismissals (user viewed but didn't tap) as negative signal.
  */
 export default function ForYouCard({ onLoad }: ForYouCardProps) {
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === "dark";
-    const colors = Colors[isDark ? "dark" : "light"];
+    const { colors, isDark } = useTheme();
 
     const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
     const [loading, setLoading] = useState(true);

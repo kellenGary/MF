@@ -1,5 +1,5 @@
 import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import { FollowingSotdItem } from "@/services/sotdApi";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -24,9 +24,7 @@ interface FloatingBubbleProps {
 }
 
 export function FloatingBubble({ item, position }: FloatingBubbleProps) {
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === "dark";
-    const colors = Colors[isDark ? "dark" : "light"];
+    const { colors } = useTheme();
 
     // Animation values
     const floatX = useSharedValue(0);

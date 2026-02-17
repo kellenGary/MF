@@ -1,7 +1,6 @@
 import NotificationBellWithData from "@/components/ui/notification-bell-with-data";
-import { Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useEffect, useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import Animated, {
@@ -17,12 +16,9 @@ import LeafLogoDraw from "../animated-logo";
 import { ThemedText } from "../themed-text";
 import { useFollowingSotds } from "./hooks";
 import { generateBubblePositions, SCREEN_HEIGHT } from "./utils";
-import { Image } from "expo-image";
 
 export default function Hero() {
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === "dark";
-    const colors = Colors[isDark ? "dark" : "light"];
+    const { colors, isDark } = useTheme();
     const { user } = useAuth();
 
     // Fetch SOTD data

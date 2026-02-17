@@ -1,6 +1,5 @@
 import { ThemedText } from "@/components/ui/themed-text";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Image } from "expo-image";
 import React, { useEffect, useMemo } from "react";
 import { StyleSheet, View } from "react-native";
@@ -108,9 +107,7 @@ export default function RingCarousel({
   height,
 }: RingCarouselProps) {
   const rotation = useSharedValue(0);
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors } = useTheme();
 
   // Ring dimensions - elliptical shape
   const centerX = width / 2;

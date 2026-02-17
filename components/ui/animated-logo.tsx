@@ -1,8 +1,7 @@
+import { useTheme } from "@/contexts/ThemeContext";
 import React, { useEffect, useRef } from "react";
 import { Animated } from "react-native";
 import Svg, { G, Path } from "react-native-svg";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
@@ -15,9 +14,7 @@ const LEAF_PATHS = [
 ];
 
 export default function LeafLogoDraw() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors } = useTheme();
   const progress = useRef(new Animated.Value(0)).current;
   const fillOpacity = useRef(new Animated.Value(0)).current;
 

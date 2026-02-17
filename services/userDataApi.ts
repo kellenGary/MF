@@ -133,8 +133,6 @@ class UserDataService {
       ? `/api/userdata/recently-played/${userId}?${params.toString()}`
       : `/api/userdata/recently-played?${params.toString()}`;
     
-    console.log('Fetching recently played with URL:', endpoint);
-
     const response = await api.makeAuthenticatedRequest(endpoint);
     if (!response.ok) {
       const errorBody = await response.text();

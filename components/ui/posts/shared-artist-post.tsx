@@ -1,25 +1,28 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import feedApi, { FeedPost } from "@/services/feedApi";
+import { MaterialIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React from "react";
-import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 
 interface SharedArtistPostProps {
   item: FeedPost;
+  onDelete?: (postId: number) => void;
 }
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
-export default function SharedArtistPost({ item }: SharedArtistPostProps) {
-  const colorScheme = useColorScheme();
+export default function SharedArtistPost({ item, onDelete }: SharedArtistPostProps) {
+  const { colors } = useTheme();
   const { user: currentUser } = useAuth();
 
   const timeAgo = feedApi.getTimeAgo(item.createdAt);
   const artist = item.artist;
   const user = item.user;
+  const isOwnPost = currentUser?.id === user.id;
 
   if (!artist) return null;
 
@@ -29,6 +32,29 @@ export default function SharedArtistPost({ item }: SharedArtistPostProps) {
 
   const handleProfilePress = () => {
     router.push(`/profile/${user.id === currentUser?.id ? "" : user.id}`);
+  };
+
+  const handleDelete = () => {
+    if (!onDelete) return;
+    Alert.alert(
+      "Delete Post",
+      "Are you sure you want to delete this post?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await feedApi.deletePost(item.id);
+              onDelete(item.id);
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete post. Please try again.");
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -43,7 +69,7 @@ export default function SharedArtistPost({ item }: SharedArtistPostProps) {
 
       {/* Gradient Overlays */}
       <LinearGradient
-        colors={["rgba(0,0,0,0.6)","rgba(0,0,0,0.4)", "transparent"]}
+        colors={["rgba(0,0,0,0.6)", "rgba(0,0,0,0.4)", "transparent"]}
         style={styles.topGradient}
       />
 
@@ -70,6 +96,11 @@ export default function SharedArtistPost({ item }: SharedArtistPostProps) {
               </Text>
             </View>
           </Pressable>
+          {isOwnPost && onDelete && (
+            <Pressable hitSlop={8} onPress={handleDelete} style={styles.deleteButton}>
+              <MaterialIcons name="delete-outline" size={22} color="rgba(255,255,255,0.8)" />
+            </Pressable>
+          )}
         </View>
 
         {/* Artist Info */}
@@ -121,6 +152,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
   },
   headerRow: {
     flexDirection: "row",
@@ -170,5 +202,8 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(0,0,0,0.3)",
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
+  },
+  deleteButton: {
+    opacity: 0.8,
   },
 });

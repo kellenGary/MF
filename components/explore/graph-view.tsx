@@ -1,6 +1,6 @@
 import { ThemedText } from "@/components/ui/themed-text";
 import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import {
   forceCenter,
   forceCollide,
@@ -13,11 +13,14 @@ import {
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
+  withTiming,
 } from "react-native-reanimated";
 import Svg, { Line } from "react-native-svg";
 
@@ -138,7 +141,7 @@ const UserNode = React.memo(
                 styles.statusText,
                 {
                   color: isFollowing
-                    ? Colors.primaryForeground
+                    ? colors.primaryForeground
                     : colors.mutedForeground,
                 },
               ]}
@@ -169,20 +172,27 @@ export default function GraphView({
   onToggleFollow,
   connections = [],
 }: GraphViewProps) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors } = useTheme();
 
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [nodePositions, setNodePositions] = useState<Map<number, { x: number; y: number }>>(new Map());
 
   // --- Animation State ---
-  const scale = useSharedValue(1);
+  const scale = useSharedValue(0.05); // Start zoomed out further
   const savedScale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
+
+  const hasAnimated = React.useRef(false);
+
+  useEffect(() => {
+    if (nodePositions.size > 0 && !hasAnimated.current) {
+      hasAnimated.current = true;
+      scale.value = withDelay(100, withTiming(1, { duration: 800, easing: Easing.out(Easing.exp) }));
+    }
+  }, [nodePositions.size]);
 
   const onLayout = (event: any) => {
     const { width, height } = event.nativeEvent.layout;
@@ -194,6 +204,12 @@ export default function GraphView({
     const nodeList: SimNode[] = [];
     const linkList: SimLink[] = [];
     const nodeIdSet = new Set<number>();
+
+    // Helper sets for classification
+    const directFollowIDs = new Set<number>();
+    Object.entries(followStatus).forEach(([id, isFollowing]) => {
+      if (isFollowing) directFollowIDs.add(Number(id));
+    });
 
     // Add current user as center node (fixed position)
     if (currentUser) {
@@ -209,23 +225,88 @@ export default function GraphView({
       nodeIdSet.add(currentUser.id);
     }
 
-    // Add other users
-    users.forEach((user, index) => {
+    // 1. Identify and Add Direct Connections (Degree 1)
+    // We want to place these in a primary ring
+    const degree1Nodes: User[] = [];
+    const degree2Nodes: { user: User; connectedTo: number }[] = [];
+    const otherNodes: User[] = [];
+
+    users.forEach((user) => {
       if (currentUser && user.id === currentUser.id) return;
+
+      if (directFollowIDs.has(user.id)) {
+        degree1Nodes.push(user);
+      } else {
+        // checks connections to see if connected to a degree 1 node
+        // This is a simple heuristic: if I don't follow them, but they are connected to someone I follow
+        const connectedToDirect = connections.find(c =>
+          (c.followerId === user.id && directFollowIDs.has(c.followeeId)) ||
+          (c.followeeId === user.id && directFollowIDs.has(c.followerId))
+        );
+
+        if (connectedToDirect) {
+          const parentId = connectedToDirect.followerId === user.id
+            ? connectedToDirect.followeeId
+            : connectedToDirect.followerId;
+          degree2Nodes.push({ user, connectedTo: parentId });
+        } else {
+          otherNodes.push(user);
+        }
+      }
+    });
+
+    // Helper to add node checking for duplicates
+    const addNode = (user: User, x: number, y: number) => {
       if (nodeIdSet.has(user.id)) return;
-
-      const angle = (index / users.length) * Math.PI * 2;
-      const radius = 150 + Math.random() * 100;
-
       nodeList.push({
         id: user.id,
         user,
         isCenter: false,
-        x: Math.cos(angle) * radius,
-        y: Math.sin(angle) * radius,
+        x, // Initial hints for simulation
+        y,
       });
       nodeIdSet.add(user.id);
+    };
+
+    // 2. Position Degree 1 Nodes (Primary Ring)
+    const primaryRadius = 250;
+    degree1Nodes.forEach((user, index) => {
+      const angle = (index / (degree1Nodes.length || 1)) * Math.PI * 2;
+      addNode(user, Math.cos(angle) * primaryRadius, Math.sin(angle) * primaryRadius);
     });
+
+    // 3. Position Degree 2 Nodes (Clusters around their parent)
+    const clusterRadius = 80;
+    degree2Nodes.forEach(({ user, connectedTo }) => {
+      // Find parent's position (heuristic or actual if already added)
+      // Since we just added them to nodeList, we can try to find them
+      const parentNode = nodeList.find(n => n.id === connectedTo);
+      let baseX = 0, baseY = 0;
+
+      if (parentNode) {
+        baseX = parentNode.x || 0;
+        baseY = parentNode.y || 0;
+      } else {
+        // Fallback if parent not found (shouldn't happen with correct order)
+        // Place vaguely in the ring
+        const angle = Math.random() * Math.PI * 2;
+        baseX = Math.cos(angle) * primaryRadius;
+        baseY = Math.sin(angle) * primaryRadius;
+      }
+
+      // Random offset from parent
+      const angle = Math.random() * Math.PI * 2;
+      const r = Math.random() * clusterRadius;
+      addNode(user, baseX + Math.cos(angle) * r, baseY + Math.sin(angle) * r);
+    });
+
+    // 4. Position Others (Randomly further out)
+    otherNodes.forEach((user) => {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 400 + Math.random() * 100;
+      addNode(user, Math.cos(angle) * radius, Math.sin(angle) * radius);
+    });
+
 
     // Add links
     if (currentUser) {
@@ -234,7 +315,7 @@ export default function GraphView({
           linkList.push({
             source: currentUser.id,
             target: Number(userId),
-            isDirect: true,
+            isDirect: true, // Degree 1 connection
           });
         }
       });
@@ -247,13 +328,12 @@ export default function GraphView({
       linkList.push({
         source: conn.followerId,
         target: conn.followeeId,
-        isDirect: false,
+        isDirect: false, // Degree 2 connection
       });
     });
 
     return { nodes: nodeList, links: linkList };
-    // Dependency array includes logic that changes structure suitable for simulation reset
-  }, [users.length, connections.length, currentUser?.id]);
+  }, [users, connections, currentUser, followStatus]);
 
   // --- Run force simulation synchronously only when structure changes ---
   useEffect(() => {
@@ -264,27 +344,35 @@ export default function GraphView({
         "link",
         forceLink<SimNode, SimLink>(links)
           .id((d) => d.id)
-          .distance(300)
-          .strength(0.3)
+          .distance((d) => {
+            // Dynamic link distance
+            if (d.isDirect) return 200; // Long leash for center -> Degree 1
+            return 60; // Short leash for Degree 1 -> Degree 2 (tight clusters)
+          })
+          .strength((d) => {
+            if (d.isDirect) return 0.1; // Softer pull from center
+            return 0.8; // Strong pull to keep clusters together
+          })
       )
       .force(
         "charge",
         forceManyBody()
-          .strength(-150)
-          .distanceMax(250)
+          .strength((d: any) => {
+            if (d.isCenter) return -300; // Strong repulsion from center
+            return -100; // Standard repulsion between nodes
+          })
+          .distanceMax(300)
       )
       .force(
         "collide",
         forceCollide<SimNode>()
-          .radius(NODE_RADIUS)
-          .strength(1)
-          .iterations(2)
+          .radius(NODE_RADIUS * 1.2) // Slightly larger collision radius
+          .strength(0.8)
+          .iterations(3)
       )
-      .force("center", forceCenter(0, 0).strength(0.05));
+      .force("center", forceCenter(0, 0).strength(0.02)); // Very weak centering to allow drift
 
     // Pre-calculate ~300 ticks to stabilize the graph
-    // This happens synchronously, blocking render for a fraction of a second
-    // but preventing 300+ re-renders
     simulation.tick(300);
     simulation.stop();
 
@@ -332,10 +420,20 @@ export default function GraphView({
   const centerOffsetX = containerSize.width / 2;
   const centerOffsetY = containerSize.height / 2;
 
+  // Show loading while positions are being calculated
+  const isCalculating = users.length > 0 && nodePositions.size === 0;
+
   return (
     <View style={styles.container} onLayout={onLayout}>
+      {isCalculating && (
+        <View style={[styles.loadingOverlay, { backgroundColor: colors.background }]}>
+          <ActivityIndicator size="large" color={colors.tint} />
+          <ThemedText style={styles.loadingText}>Organizing visualizer...</ThemedText>
+        </View>
+      )}
+
       <GestureDetector gesture={composedGesture}>
-        <Animated.View style={[styles.gestureArea, animatedStyle]}>
+        <Animated.View style={[styles.gestureArea, animatedStyle, { opacity: isCalculating ? 0 : 1 }]}>
           {/* Connections Layer (SVG) */}
           <View
             style={[
@@ -376,7 +474,6 @@ export default function GraphView({
                     y2={targetPos.y}
                     stroke={link.isDirect ? Colors.primary : "#FFFFFF"}
                     strokeWidth={isSolid ? 0.5 : 1}
-                    strokeDasharray={isSolid ? undefined : "5, 5"}
                     opacity={link.isDirect ? 0.8 : (isFollowedConnection ? 0.6 : 0.4)}
                   />
                 );
@@ -415,6 +512,17 @@ const styles = StyleSheet.create({
   },
   gestureArea: {
     flex: 1,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    fontWeight: "500",
   },
   svgContainer: {
     position: "absolute",

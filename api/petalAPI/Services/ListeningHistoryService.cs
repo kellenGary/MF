@@ -676,6 +676,22 @@ public class ListeningHistoryService : IListeningHistoryService
             // Save all changes together (track-artists + listening history)
             await _context.SaveChangesAsync();
 
+            // Trigger session detection for synced tracks
+            try
+            {
+                await _listeningSessionService.ProcessNewTrackAsync(
+                    userId,
+                    listeningHistory.Id,
+                    dbTrack.Id,
+                    playedAt,
+                    dbTrack.DurationMs);
+            }
+            catch (Exception sessionEx)
+            {
+                // Log but don't fail the main operation if session processing fails
+                _logger.LogWarning(sessionEx, "[ListeningHistory] Session processing failed for user {UserId} during sync", userId);
+            }
+
             _logger.LogInformation("[ListeningHistory] Added listening entry for user {UserId}, track {TrackName} ({SpotifyId})", 
                 userId, dbTrack.Name, spotifyId);
 

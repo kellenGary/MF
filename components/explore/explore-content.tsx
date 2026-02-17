@@ -1,13 +1,10 @@
 import { ThemedText } from '@/components/ui/themed-text';
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import React from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 export default function ExploreContent() {
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === "dark";
-    const colors = Colors[isDark ? "dark" : "light"];
+    const { colors } = useTheme();
 
     const renderSection = (title: string) => (
         <View style={styles.section}>

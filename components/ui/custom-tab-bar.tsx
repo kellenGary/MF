@@ -1,5 +1,5 @@
 import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -24,9 +24,7 @@ const TAB_CONFIG: TabConfig[] = [
 ];
 
 export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === "dark";
-    const colors = Colors[isDark ? "dark" : "light"];
+    const { colors, isDark } = useTheme();
     const insets = useSafeAreaInsets();
 
     return (

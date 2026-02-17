@@ -1,15 +1,12 @@
 import { ThemedText } from "@/components/ui/themed-text";
-import { Colors } from "@/constants/theme";
+import TrackList, { ListItem } from "@/components/ui/track-list";
 import { useScrollContext } from "@/contexts/ScrollContext";
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import searchApi, { SearchResults, SearchTrack, SearchUser } from "@/services/searchApi";
-import { Image } from "expo-image";
+import { useTheme } from "@/contexts/ThemeContext";
+import searchApi, { SearchResults } from "@/services/searchApi";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
-    Pressable,
-    ScrollView,
     StyleSheet,
     View,
 } from "react-native";
@@ -21,9 +18,7 @@ interface SearchViewProps {
 
 export default function SearchView({ query }: SearchViewProps) {
     const router = useRouter();
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === "dark";
-    const colors = Colors[isDark ? "dark" : "light"];
+    const { colors } = useTheme();
     const insets = useSafeAreaInsets();
     const { collapse } = useScrollContext();
 
@@ -59,65 +54,37 @@ export default function SearchView({ query }: SearchViewProps) {
         return `${minutes}:${seconds.toString().padStart(2, "0")}`;
     };
 
-    const renderUserItem = (user: SearchUser) => (
-        <Pressable
-            key={`user-${user.id}`}
-            style={[styles.itemContainer, { backgroundColor: colors.card }]}
-            onPress={() => router.push(`/profile/${user.id}`)}
-        >
-            {user.profileImageUrl ? (
-                <Image source={{ uri: user.profileImageUrl }} style={styles.avatar} />
-            ) : (
-                <View style={[styles.avatarPlaceholder, { backgroundColor: colors.muted }]}>
-                    <ThemedText style={styles.avatarText}>
-                        {user.displayName?.[0]?.toUpperCase() || "?"}
-                    </ThemedText>
-                </View>
-            )}
-            <View style={styles.itemInfo}>
-                <ThemedText style={styles.itemTitle} numberOfLines={1}>
-                    {user.displayName}
-                </ThemedText>
-                <ThemedText style={[styles.itemSubtitle, { color: colors.mutedForeground }]} numberOfLines={1}>
-                    @{user.handle}
-                </ThemedText>
-            </View>
-            <View style={[styles.typeBadge, { backgroundColor: Colors.primary }]}>
-                <ThemedText style={[styles.typeBadgeText, { color: Colors.primaryForeground }]}>
-                    User
-                </ThemedText>
-            </View>
-        </Pressable>
-    );
+    const listItems: ListItem[] = useMemo(() => {
+        const users: ListItem[] = results.users.map((user) => ({
+            id: `user-${user.id}`,
+            name: user.displayName,
+            subtitle: `@${user.handle}`,
+            imageUrl: user.profileImageUrl,
+            type: "user" as const,
+        }));
 
-    const renderTrackItem = (track: SearchTrack) => (
-        <Pressable
-            key={`track-${track.id}`}
-            style={[styles.itemContainer, { backgroundColor: colors.card }]}
-            onPress={() => router.push(`/song/${track.spotifyId}`)}
-        >
-            {track.albumImageUrl ? (
-                <Image source={{ uri: track.albumImageUrl }} style={styles.albumArt} />
-            ) : (
-                <View style={[styles.albumArtPlaceholder, { backgroundColor: colors.muted }]}>
-                    <ThemedText style={styles.albumArtText}>♪</ThemedText>
-                </View>
-            )}
-            <View style={styles.itemInfo}>
-                <ThemedText style={styles.itemTitle} numberOfLines={1}>
-                    {track.name}
-                </ThemedText>
-                <ThemedText style={[styles.itemSubtitle, { color: colors.mutedForeground }]} numberOfLines={1}>
-                    {track.artistName || "Unknown Artist"} • {formatDuration(track.durationMs)}
-                </ThemedText>
-            </View>
-            <View style={[styles.typeBadge, { backgroundColor: colors.muted }]}>
-                <ThemedText style={[styles.typeBadgeText, { color: colors.mutedForeground }]}>
-                    Song
-                </ThemedText>
-            </View>
-        </Pressable>
-    );
+        const tracks: ListItem[] = results.tracks.map((track) => ({
+            id: `track-${track.id}`,
+            name: track.name,
+            subtitle: `${track.artistName || "Unknown Artist"} • ${formatDuration(track.durationMs)}`,
+            imageUrl: track.albumImageUrl,
+            type: "song" as const,
+        }));
+
+        return [...users, ...tracks];
+    }, [results]);
+
+    const handleItemPress = (item: ListItem) => {
+        if (item.type === "user") {
+            const userId = item.id.replace("user-", "");
+            router.push(`/profile/${userId}`);
+        } else {
+            const track = results.tracks.find((t) => `track-${t.id}` === item.id);
+            if (track) {
+                router.push(`/song/${track.spotifyId}`);
+            }
+        }
+    };
 
     if (loading) {
         return (
@@ -127,36 +94,34 @@ export default function SearchView({ query }: SearchViewProps) {
         );
     }
 
-    const hasResults = results.users.length > 0 || results.tracks.length > 0;
+    const hasResults = listItems.length > 0;
 
     return (
-        <ScrollView
-            style={[styles.container, { backgroundColor: colors.background }]}
-            contentContainerStyle={[styles.content, { paddingTop: insets.top + 140 }]}
-            onScrollBeginDrag={collapse}
-        >
-            {!hasResults && query.trim() && (
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+            {!hasResults && query.trim() ? (
                 <View style={styles.emptyContainer}>
                     <ThemedText style={[styles.emptyText, { color: colors.mutedForeground }]}>
                         No results found for "{query}"
                     </ThemedText>
                 </View>
+            ) : (
+                <TrackList
+                    items={listItems}
+                    onItemPress={handleItemPress}
+                    showTypeBadge
+                    emptyMessage=""
+                    flatListProps={{
+                        contentContainerStyle: styles.content,
+                        onScrollBeginDrag: collapse,
+                        ListHeaderComponent: hasResults ? (
+                            <ThemedText type="subtitle" style={styles.sectionTitle}>
+                                Results
+                            </ThemedText>
+                        ) : null,
+                    }}
+                />
             )}
-
-            {results.users.length > 0 && (
-                <View style={styles.section}>
-                    <ThemedText style={styles.sectionTitle}>Users</ThemedText>
-                    {results.users.map(renderUserItem)}
-                </View>
-            )}
-
-            {results.tracks.length > 0 && (
-                <View style={styles.section}>
-                    <ThemedText style={styles.sectionTitle}>Songs</ThemedText>
-                    {results.tracks.map(renderTrackItem)}
-                </View>
-            )}
-        </ScrollView>
+        </View>
     );
 }
 
@@ -180,71 +145,7 @@ const styles = StyleSheet.create({
     emptyText: {
         fontSize: 16,
     },
-    section: {
-        marginBottom: 24,
-    },
     sectionTitle: {
-        fontSize: 18,
-        fontWeight: "700",
-        marginBottom: 12,
-    },
-    itemContainer: {
-        flexDirection: "row",
-        alignItems: "center",
-        padding: 12,
-        borderRadius: 12,
         marginBottom: 8,
-    },
-    avatar: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-    },
-    avatarPlaceholder: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    avatarText: {
-        fontSize: 20,
-        fontWeight: "bold",
-    },
-    albumArt: {
-        width: 48,
-        height: 48,
-        borderRadius: 8,
-    },
-    albumArtPlaceholder: {
-        width: 48,
-        height: 48,
-        borderRadius: 8,
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    albumArtText: {
-        fontSize: 24,
-    },
-    itemInfo: {
-        flex: 1,
-        marginLeft: 12,
-    },
-    itemTitle: {
-        fontSize: 16,
-        fontWeight: "600",
-    },
-    itemSubtitle: {
-        fontSize: 14,
-        marginTop: 2,
-    },
-    typeBadge: {
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 12,
-    },
-    typeBadgeText: {
-        fontSize: 12,
-        fontWeight: "600",
     },
 });

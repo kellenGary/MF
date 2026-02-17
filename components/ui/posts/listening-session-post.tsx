@@ -1,7 +1,6 @@
 import { ThemedText } from '@/components/ui/themed-text';
 import TrackCarousel from '@/components/ui/track-carousel';
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import feedApi, { FeedPost, FeedTrack } from "@/services/feedApi";
 import React from "react";
 import { StyleSheet, View } from "react-native";
@@ -9,14 +8,14 @@ import PostHeader from "./post-header";
 
 interface ListeningSessionPostProps {
   item: FeedPost;
+  onDelete?: (postId: number) => void;
 }
 
 export default function ListeningSessionPost({
   item,
+  onDelete,
 }: ListeningSessionPostProps) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors } = useTheme();
 
   const timeAgo = feedApi.getTimeAgo(item.createdAt);
   const metadata = feedApi.parseListeningSessionMetadata(item);
@@ -38,7 +37,16 @@ export default function ListeningSessionPost({
 
   return (
     <View style={styles.card}>
-      <PostHeader user={item.user} timeAgo={timeAgo} />
+      <PostHeader
+        user={item.user}
+        timeAgo={timeAgo}
+        postId={item.id}
+        onDelete={onDelete}
+        initialLiked={item.isLiked}
+        initialLikeCount={item.likeCount}
+        initialReposted={item.isReposted}
+        initialRepostCount={item.repostCount}
+      />
 
       <View style={styles.sessionInfo}>
         <ThemedText style={[styles.actionLabel, { color: colors.text }]}>

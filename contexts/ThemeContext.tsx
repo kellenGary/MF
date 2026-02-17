@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import * as SecureStore from 'expo-secure-store';
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { useColorScheme as useNativeColorScheme } from 'react-native';
@@ -9,6 +10,8 @@ interface ThemeContextType {
     theme: ThemeType;
     userTheme: UserThemePreference;
     setTheme: (theme: UserThemePreference) => void;
+    isDark: boolean;
+    colors: typeof Colors.light;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -52,12 +55,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             ? (systemColorScheme === 'dark' ? 'dark' : 'light')
             : userTheme;
 
+    const isDark = theme === 'dark';
+    const colors = Colors[theme];
+
     if (!isLoaded) {
         return null; // or a splash screen if needed, but usually fast enough
     }
 
     return (
-        <ThemeContext.Provider value={{ theme, userTheme, setTheme }}>
+        <ThemeContext.Provider value={{ theme, userTheme, setTheme, isDark, colors }}>
             {children}
         </ThemeContext.Provider>
     );
@@ -70,3 +76,5 @@ export function useThemeContext() {
     }
     return context;
 }
+
+export const useTheme = useThemeContext;

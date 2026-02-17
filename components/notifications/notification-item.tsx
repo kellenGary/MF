@@ -1,5 +1,4 @@
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTheme } from '@/contexts/ThemeContext';
 import notificationApi, { Notification } from '@/services/notificationApi';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -13,9 +12,7 @@ interface NotificationItemProps {
 }
 
 export default function NotificationItem({ notification, onPress }: NotificationItemProps) {
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === 'dark';
-    const colors = Colors[isDark ? 'dark' : 'light'];
+    const { colors, isDark } = useTheme();
 
     const handlePress = () => {
         if (onPress) {

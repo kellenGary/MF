@@ -1,5 +1,4 @@
-import { Colors } from '@/constants/theme'
-import { useColorScheme } from '@/hooks/use-color-scheme'
+import { useTheme } from '@/contexts/ThemeContext'
 import { MaterialIcons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import React from 'react'
@@ -7,9 +6,7 @@ import { Pressable, StyleSheet, View } from 'react-native'
 import { ThemedText } from './themed-text'
 
 const QuickNav = () => {
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === "dark";
-    const colors = Colors[isDark ? "dark" : "light"];
+    const { colors } = useTheme();
 
     const navItems = [
         { title: "Songs of the Week", icon: "music-note", route: "/songs-of-week", color: colors.chart1 },

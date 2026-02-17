@@ -1,5 +1,4 @@
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import Entypo from "@expo/vector-icons/Entypo";
 import { BlurView } from "expo-blur";
 import { router } from "expo-router";
@@ -20,9 +19,7 @@ export default function BlurBackButton({
   onPress,
   style,
 }: BlurBackButtonProps) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors, isDark } = useTheme();
 
   return (
     <Pressable

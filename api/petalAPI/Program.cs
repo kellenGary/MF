@@ -83,6 +83,9 @@ builder.Services.AddScoped<ISavedTracksSyncService, SavedTracksSyncService>();
 builder.Services.AddScoped<IPostService, PostService>();
 builder.Services.AddScoped<ISpotifyDataService, SpotifyDataService>();
 
+// Register background services
+builder.Services.AddHostedService<SpotifySyncBackgroundService>();
+
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var secretKey = jwtSettings["SecretKey"];

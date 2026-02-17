@@ -1,5 +1,5 @@
 import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Switch } from "react-native";
 import { SettingsRow } from "./settings-row";
@@ -25,9 +25,7 @@ export function SettingsSwitch({
   disabled = false,
   isLast = false,
 }: SettingsSwitchProps) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors, isDark } = useTheme();
 
   return (
     <SettingsRow

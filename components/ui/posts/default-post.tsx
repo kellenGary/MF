@@ -1,21 +1,19 @@
 import { ThemedText } from '@/components/ui/themed-text';
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import feedApi, { FeedPost } from "@/services/feedApi";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import PostHeader from "./post-header";
 
 interface DefaultPostProps {
   item: FeedPost;
+  onDelete?: (postId: number) => void;
 }
 
-export default function DefaultPost({ item }: DefaultPostProps) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+export default function DefaultPost({ item, onDelete }: DefaultPostProps) {
+  const { colors, isDark } = useTheme();
 
   const imageUrl = feedApi.getPostImageUrl(item);
   const timeAgo = feedApi.getTimeAgo(item.createdAt);
@@ -67,7 +65,16 @@ export default function DefaultPost({ item }: DefaultPostProps) {
       ]}
       onPress={handlePress}
     >
-      <PostHeader user={item.user} timeAgo={timeAgo} />
+      <PostHeader
+        user={item.user}
+        timeAgo={timeAgo}
+        postId={item.id}
+        onDelete={onDelete}
+        initialLiked={item.isLiked}
+        initialLikeCount={item.likeCount}
+        initialReposted={item.isReposted}
+        initialRepostCount={item.repostCount}
+      />
 
       <View style={styles.content}>
         {imageUrl && (

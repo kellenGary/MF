@@ -1,5 +1,4 @@
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Image } from "expo-image";
 import { RelativePathString, router } from "expo-router";
@@ -21,12 +20,10 @@ export default function PlaylistItem({
   cover,
   link,
 }: PlaylistItemProps) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors } = useTheme();
 
   const handlePress = () => {
-      router.push(link);
+    router.push(link);
   };
 
   return (

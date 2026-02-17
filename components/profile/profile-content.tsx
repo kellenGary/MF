@@ -1,7 +1,7 @@
 import { ThemedText } from "@/components/ui/themed-text";
 import TrackCarousel from "@/components/ui/track-carousel";
 import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTheme } from "@/contexts/ThemeContext";
 import { FeedTrack } from "@/services/feedApi";
 import { Image } from "expo-image";
 import { router } from "expo-router";
@@ -30,9 +30,7 @@ export default function ProfileContent({
     isOwnProfile,
     spotifyId,
 }: ProfileContentProps) {
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === "dark";
-    const colors = Colors[isDark ? "dark" : "light"];
+    const { colors } = useTheme();
 
     if (loading) {
         return (
