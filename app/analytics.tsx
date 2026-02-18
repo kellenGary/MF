@@ -76,11 +76,16 @@ export default function AnalyticsScreen() {
         fetchData();
     };
 
+    const hasNoData =
+        topTracks.length === 0 &&
+        topArtists.length === 0 &&
+        topAlbums.length === 0;
+
     if (loading) {
         return (
             <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
                 <ActivityIndicator size="large" color={Colors.primary} />
-                <ThemedText style={styles.loadingText}>Loading analytics...</ThemedText>
+                <ThemedText type="small" style={styles.loadingText}>Loading analytics...</ThemedText>
             </View>
         );
     }
@@ -100,7 +105,12 @@ export default function AnalyticsScreen() {
                     <Pressable onPress={() => router.back()} style={styles.backButton}>
                         <MaterialIcons name="arrow-back" size={24} color={colors.text} />
                     </Pressable>
-                    <ThemedText style={styles.title}>Analytics</ThemedText>
+                    <View style={styles.headerContent}>
+                        <ThemedText type="title">Analytics</ThemedText>
+                        <ThemedText type="small" style={{ color: colors.icon }}>
+                            Your listening insights
+                        </ThemedText>
+                    </View>
                 </View>
 
                 {/* Time Frame Selector */}
@@ -120,29 +130,42 @@ export default function AnalyticsScreen() {
                     ))}
                 </View>
 
+                {/* Empty State */}
+                {hasNoData && (
+                    <View style={styles.emptyState}>
+                        <MaterialIcons name="bar-chart" size={48} color={colors.icon} />
+                        <ThemedText type="defaultSemiBold" style={[styles.emptyStateTitle, { color: colors.icon }]}>
+                            No analytics data yet
+                        </ThemedText>
+                        <ThemedText type="small" style={[styles.emptyStateSubtext, { color: colors.icon }]}>
+                            Start listening to see your stats!
+                        </ThemedText>
+                    </View>
+                )}
+
                 {/* Overview Stats */}
                 {overview && (
-                    <View style={styles.statsGrid}>
-                        <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+                    <View style={[styles.statsGrid, { backgroundColor: colors.card }]}>
+                        <View style={styles.statCard}>
                             <MaterialIcons name="play-circle-filled" size={28} color={Colors.primary} />
-                            <ThemedText style={styles.statValue}>{overview.totalPlays}</ThemedText>
-                            <ThemedText style={[styles.statLabel, { color: colors.icon }]}>
+                            <ThemedText type="subtitle" style={styles.statValue}>{overview.totalPlays}</ThemedText>
+                            <ThemedText type="small" style={[styles.statLabel, { color: colors.icon }]}>
                                 Total Plays
                             </ThemedText>
                         </View>
-                        <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+                        <View style={styles.statCard}>
                             <MaterialIcons name="access-time" size={28} color={Colors.primary} />
-                            <ThemedText style={styles.statValue}>
+                            <ThemedText type="subtitle" style={styles.statValue}>
                                 {Math.round(overview.totalMinutes)}
                             </ThemedText>
-                            <ThemedText style={[styles.statLabel, { color: colors.icon }]}>
-                                Minutes Listened
+                            <ThemedText type="small" style={[styles.statLabel, { color: colors.icon }]}>
+                                Minutes
                             </ThemedText>
                         </View>
-                        <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+                        <View style={styles.statCard}>
                             <MaterialIcons name="library-music" size={28} color={Colors.primary} />
-                            <ThemedText style={styles.statValue}>{overview.uniqueTracks}</ThemedText>
-                            <ThemedText style={[styles.statLabel, { color: colors.icon }]}>
+                            <ThemedText type="subtitle" style={styles.statValue}>{overview.uniqueTracks}</ThemedText>
+                            <ThemedText type="small" style={[styles.statLabel, { color: colors.icon }]}>
                                 Unique Tracks
                             </ThemedText>
                         </View>
@@ -150,115 +173,127 @@ export default function AnalyticsScreen() {
                 )}
 
                 {/* Top Tracks */}
-                <View style={styles.section}>
-                    <ThemedText style={styles.sectionTitle}>Top Tracks</ThemedText>
-                    {topTracks.length === 0 ? (
-                        <ThemedText style={[styles.emptyText, { color: colors.icon }]}>
-                            No data for this period
-                        </ThemedText>
-                    ) : (
-                        topTracks.map((track, index) => (
+                {topTracks.length > 0 && (
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <MaterialIcons name="music-note" size={22} color={Colors.primary} />
+                            <ThemedText type="subtitle">Top Tracks</ThemedText>
+                        </View>
+                        {topTracks.map((track, index) => (
                             <Pressable
                                 key={track.id}
                                 style={[styles.listItem, { backgroundColor: colors.card }]}
                                 onPress={() => router.push(`/song/${track.spotifyId}` as any)}
                             >
-                                <ThemedText style={[styles.rank, { color: Colors.primary }]}>
-                                    #{index + 1}
-                                </ThemedText>
+                                <View style={[styles.rankBadge, { backgroundColor: Colors.primary + "20" }]}>
+                                    <ThemedText type="small" style={[styles.rankText, { color: Colors.primary }]}>
+                                        {index + 1}
+                                    </ThemedText>
+                                </View>
                                 <Image
-                                    source={{ uri: track.album?.image_url || "https://via.placeholder.com/48" }}
+                                    source={{ uri: track.album?.image_url || "https://via.placeholder.com/52" }}
                                     style={styles.itemImage}
                                 />
                                 <View style={styles.itemInfo}>
-                                    <ThemedText style={styles.itemName} numberOfLines={1}>
+                                    <ThemedText type="defaultSemiBold" numberOfLines={1}>
                                         {track.name}
                                     </ThemedText>
-                                    <ThemedText style={[styles.itemSubtitle, { color: colors.icon }]} numberOfLines={1}>
+                                    <ThemedText type="small" style={{ color: colors.icon, marginTop: 3 }} numberOfLines={1}>
                                         {track.artists.join(", ")}
                                     </ThemedText>
                                 </View>
-                                <View style={styles.playCount}>
-                                    <ThemedText style={[styles.playCountText, { color: colors.icon }]}>
-                                        {track.playCount} plays
-                                    </ThemedText>
+                                <View style={styles.statsContainer}>
+                                    <View style={styles.stat}>
+                                        <MaterialIcons name="play-arrow" size={14} color={colors.icon} />
+                                        <ThemedText type="small" style={{ color: colors.icon }}>
+                                            {track.playCount}
+                                        </ThemedText>
+                                    </View>
                                 </View>
                             </Pressable>
-                        ))
-                    )}
-                </View>
+                        ))}
+                    </View>
+                )}
 
                 {/* Top Artists */}
-                <View style={styles.section}>
-                    <ThemedText style={styles.sectionTitle}>Top Artists</ThemedText>
-                    {topArtists.length === 0 ? (
-                        <ThemedText style={[styles.emptyText, { color: colors.icon }]}>
-                            No data for this period
-                        </ThemedText>
-                    ) : (
-                        topArtists.map((artist, index) => (
+                {topArtists.length > 0 && (
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <MaterialIcons name="mic" size={22} color={Colors.primary} />
+                            <ThemedText type="subtitle">Top Artists</ThemedText>
+                        </View>
+                        {topArtists.map((artist, index) => (
                             <Pressable
                                 key={artist.id}
                                 style={[styles.listItem, { backgroundColor: colors.card }]}
                                 onPress={() => router.push(`/artist/${artist.spotifyId}` as any)}
                             >
-                                <ThemedText style={[styles.rank, { color: Colors.primary }]}>
-                                    #{index + 1}
-                                </ThemedText>
+                                <View style={[styles.rankBadge, { backgroundColor: Colors.primary + "20" }]}>
+                                    <ThemedText type="small" style={[styles.rankText, { color: Colors.primary }]}>
+                                        {index + 1}
+                                    </ThemedText>
+                                </View>
                                 <Image
-                                    source={{ uri: artist.imageUrl || "https://via.placeholder.com/48" }}
+                                    source={{ uri: artist.imageUrl || "https://via.placeholder.com/52" }}
                                     style={[styles.itemImage, styles.artistImage]}
                                 />
                                 <View style={styles.itemInfo}>
-                                    <ThemedText style={styles.itemName} numberOfLines={1}>
+                                    <ThemedText type="defaultSemiBold" numberOfLines={1}>
                                         {artist.name}
                                     </ThemedText>
                                 </View>
-                                <View style={styles.playCount}>
-                                    <ThemedText style={[styles.playCountText, { color: colors.icon }]}>
-                                        {artist.playCount} plays
-                                    </ThemedText>
+                                <View style={styles.statsContainer}>
+                                    <View style={styles.stat}>
+                                        <MaterialIcons name="play-arrow" size={14} color={colors.icon} />
+                                        <ThemedText type="small" style={{ color: colors.icon }}>
+                                            {artist.playCount}
+                                        </ThemedText>
+                                    </View>
                                 </View>
                             </Pressable>
-                        ))
-                    )}
-                </View>
+                        ))}
+                    </View>
+                )}
 
                 {/* Top Albums */}
-                <View style={styles.section}>
-                    <ThemedText style={styles.sectionTitle}>Top Albums</ThemedText>
-                    {topAlbums.length === 0 ? (
-                        <ThemedText style={[styles.emptyText, { color: colors.icon }]}>
-                            No data for this period
-                        </ThemedText>
-                    ) : (
-                        topAlbums.map((album, index) => (
+                {topAlbums.length > 0 && (
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <MaterialIcons name="album" size={22} color={Colors.primary} />
+                            <ThemedText type="subtitle">Top Albums</ThemedText>
+                        </View>
+                        {topAlbums.map((album, index) => (
                             <Pressable
                                 key={album.id}
                                 style={[styles.listItem, { backgroundColor: colors.card }]}
                                 onPress={() => router.push(`/album/${album.spotifyId}` as any)}
                             >
-                                <ThemedText style={[styles.rank, { color: Colors.primary }]}>
-                                    #{index + 1}
-                                </ThemedText>
+                                <View style={[styles.rankBadge, { backgroundColor: Colors.primary + "20" }]}>
+                                    <ThemedText type="small" style={[styles.rankText, { color: Colors.primary }]}>
+                                        {index + 1}
+                                    </ThemedText>
+                                </View>
                                 <Image
-                                    source={{ uri: album.imageUrl || "https://via.placeholder.com/48" }}
+                                    source={{ uri: album.imageUrl || "https://via.placeholder.com/52" }}
                                     style={styles.itemImage}
                                 />
                                 <View style={styles.itemInfo}>
-                                    <ThemedText style={styles.itemName} numberOfLines={1}>
+                                    <ThemedText type="defaultSemiBold" numberOfLines={1}>
                                         {album.name}
                                     </ThemedText>
                                 </View>
-                                <View style={styles.playCount}>
-                                    <ThemedText style={[styles.playCountText, { color: colors.icon }]}>
-                                        {album.playCount} plays
-                                    </ThemedText>
+                                <View style={styles.statsContainer}>
+                                    <View style={styles.stat}>
+                                        <MaterialIcons name="play-arrow" size={14} color={colors.icon} />
+                                        <ThemedText type="small" style={{ color: colors.icon }}>
+                                            {album.playCount}
+                                        </ThemedText>
+                                    </View>
                                 </View>
                             </Pressable>
-                        ))
-                    )}
-                </View>
+                        ))}
+                    </View>
+                )}
             </ScrollView>
         </View>
     );
@@ -277,7 +312,7 @@ const styles = StyleSheet.create({
     },
     header: {
         paddingHorizontal: 16,
-        paddingBottom: 16,
+        paddingBottom: 20,
         flexDirection: "row",
         alignItems: "center",
         gap: 12,
@@ -286,13 +321,11 @@ const styles = StyleSheet.create({
         padding: 8,
         marginLeft: -8,
     },
-    title: {
-        fontSize: 28,
-        fontWeight: "bold",
+    headerContent: {
+        flex: 1,
     },
     loadingText: {
         marginTop: 12,
-        fontSize: 14,
     },
     filterContainer: {
         flexDirection: "row",
@@ -302,78 +335,85 @@ const styles = StyleSheet.create({
         paddingBottom: 16,
         gap: 8,
     },
+    emptyState: {
+        alignItems: "center",
+        paddingTop: 80,
+        paddingHorizontal: 32,
+    },
+    emptyStateTitle: {
+        marginTop: 16,
+    },
+    emptyStateSubtext: {
+        textAlign: "center",
+        marginTop: 8,
+    },
     statsGrid: {
         flexDirection: "row",
-        paddingHorizontal: 16,
+        marginHorizontal: 16,
+        padding: 16,
+        borderRadius: 14,
         gap: 12,
-        marginBottom: 24,
+        marginBottom: 28,
     },
     statCard: {
         flex: 1,
         alignItems: "center",
-        padding: 16,
-        borderRadius: 12,
     },
     statValue: {
-        fontSize: 24,
-        fontWeight: "bold",
         marginTop: 8,
     },
     statLabel: {
-        fontSize: 11,
         marginTop: 4,
         textAlign: "center",
     },
     section: {
-        marginBottom: 24,
+        marginBottom: 28,
     },
-    sectionTitle: {
-        fontSize: 20,
-        fontWeight: "700",
+    sectionHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
         paddingHorizontal: 16,
-        marginBottom: 12,
-    },
-    emptyText: {
-        paddingHorizontal: 16,
-        fontSize: 14,
+        marginBottom: 14,
     },
     listItem: {
         flexDirection: "row",
         alignItems: "center",
         marginHorizontal: 16,
-        marginBottom: 8,
+        marginBottom: 10,
         padding: 12,
-        borderRadius: 12,
+        borderRadius: 14,
     },
-    rank: {
-        fontSize: 14,
+    rankBadge: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        alignItems: "center",
+        justifyContent: "center",
+        marginRight: 10,
+    },
+    rankText: {
         fontWeight: "bold",
-        width: 32,
     },
     itemImage: {
-        width: 48,
-        height: 48,
-        borderRadius: 6,
+        width: 52,
+        height: 52,
+        borderRadius: 8,
     },
     artistImage: {
-        borderRadius: 24,
+        borderRadius: 26,
     },
     itemInfo: {
         flex: 1,
         marginLeft: 12,
     },
-    itemName: {
-        fontSize: 15,
-        fontWeight: "600",
-    },
-    itemSubtitle: {
-        fontSize: 13,
-        marginTop: 2,
-    },
-    playCount: {
+    statsContainer: {
         marginLeft: 8,
+        alignItems: "flex-end",
     },
-    playCountText: {
-        fontSize: 12,
+    stat: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
     },
 });
