@@ -38,8 +38,8 @@ public class TrendingController : ControllerBase
                 PlayCount = g.Count(),
                 UniqueListeners = g.Select(x => x.UserId).Distinct().Count()
             })
-            .OrderByDescending(x => x.UniqueListeners)
-            .ThenByDescending(x => x.PlayCount)
+            .OrderByDescending(x => x.PlayCount)
+            .ThenByDescending(x => x.UniqueListeners)
             .Take(limit)
             .Join(
                 _context.Tracks
@@ -53,7 +53,7 @@ public class TrendingController : ControllerBase
                     id = track.Id,
                     spotifyId = track.SpotifyId,
                     name = track.Name,
-                    playCount = top.PlayCount,
+                    totalStreams = top.PlayCount,
                     uniqueListeners = top.UniqueListeners,
                     artists = track.TrackArtists.Select(ta => ta.Artist.Name).ToArray(),
                     album = track.Album != null ? new
@@ -89,8 +89,8 @@ public class TrendingController : ControllerBase
                 PlayCount = g.Count(),
                 UniqueListeners = g.Select(x => x.lh.UserId).Distinct().Count()
             })
-            .OrderByDescending(x => x.UniqueListeners)
-            .ThenByDescending(x => x.PlayCount)
+            .OrderByDescending(x => x.PlayCount)
+            .ThenByDescending(x => x.UniqueListeners)
             .Take(limit)
             .Join(
                 _context.Artists,
@@ -102,7 +102,7 @@ public class TrendingController : ControllerBase
                     spotifyId = artist.SpotifyId,
                     name = artist.Name,
                     imageUrl = artist.ImageUrl,
-                    playCount = top.PlayCount,
+                    totalStreams = top.PlayCount,
                     uniqueListeners = top.UniqueListeners
                 })
             .ToListAsync();
@@ -131,11 +131,12 @@ public class TrendingController : ControllerBase
                 PlayCount = g.Count(),
                 UniqueListeners = g.Select(x => x.lh.UserId).Distinct().Count()
             })
-            .OrderByDescending(x => x.UniqueListeners)
-            .ThenByDescending(x => x.PlayCount)
+            .OrderByDescending(x => x.PlayCount)
+            .ThenByDescending(x => x.UniqueListeners)
             .Take(limit)
             .Join(
-                _context.Albums,
+                _context.Albums
+                    .Include(a => a.Artist),
                 top => top.AlbumId,
                 album => album.Id,
                 (top, album) => new
@@ -143,8 +144,9 @@ public class TrendingController : ControllerBase
                     id = album.Id,
                     spotifyId = album.SpotifyId,
                     name = album.Name,
+                    artistName = album.Artist != null ? album.Artist.Name : "Unknown Artist",
                     imageUrl = album.ImageUrl,
-                    playCount = top.PlayCount,
+                    totalStreams = top.PlayCount,
                     uniqueListeners = top.UniqueListeners
                 })
             .ToListAsync();

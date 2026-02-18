@@ -11,7 +11,7 @@ export interface TopTrack {
   id: number;
   spotifyId: string;
   name: string;
-  playCount: number;
+  totalStreams: number;
   totalMinutes: number;
   artists: string[];
   album: {
@@ -26,15 +26,15 @@ export interface TopArtist {
   spotifyId: string;
   name: string;
   imageUrl: string | null;
-  playCount: number;
+  totalStreams: number;
 }
 
 export interface TopAlbum {
   id: number;
   spotifyId: string;
   name: string;
-  imageUrl: string | null;
   playCount: number;
+  imageUrl: string | null;
 }
 
 export interface ActivityPoint {

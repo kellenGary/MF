@@ -47,7 +47,19 @@ export const ArtistCard = ({ artist, index }: ArtistCardProps) => {
                     )}
                     {/* Rank Badge */}
                     <View style={[styles.rankBadgeFloating, { backgroundColor: Colors.primary }]}>
-                        <ThemedText style={{ color: "#FFF", fontSize: 10, fontWeight: "bold" }}>#{index + 1}</ThemedText>
+                        <ThemedText
+                            style={{
+                                color: "#FFF",
+                                fontSize: 10,
+                                fontWeight: "bold",
+                                textAlign: "center",
+                                lineHeight: 12,
+                                width: "100%",
+                                includeFontPadding: false,
+                            }}
+                        >
+                            #{index + 1}
+                        </ThemedText>
                     </View>
                 </View>
 

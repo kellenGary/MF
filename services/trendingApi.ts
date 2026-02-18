@@ -4,7 +4,7 @@ export interface TrendingTrack {
   id: number;
   spotifyId: string;
   name: string;
-  playCount: number;
+  totalStreams: number;
   uniqueListeners: number;
   artists: string[];
   album: {
@@ -19,7 +19,7 @@ export interface TrendingArtist {
   spotifyId: string;
   name: string;
   imageUrl: string | null;
-  playCount: number;
+  totalStreams: number;
   uniqueListeners: number;
 }
 
@@ -27,8 +27,9 @@ export interface TrendingAlbum {
   id: number;
   spotifyId: string;
   name: string;
+  artistName: string;
   imageUrl: string | null;
-  playCount: number;
+  totalStreams: number;
   uniqueListeners: number;
 }
 
