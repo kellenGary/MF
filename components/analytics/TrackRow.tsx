@@ -35,20 +35,29 @@ export const TrackRow = ({
         <Animated.View
             layout={Layout.springify()}
             entering={FadeInDown.delay(index * 100).springify()}
-            style={[styles.trackRowCard, { backgroundColor: colors.card }]}
+            style={[styles.trackRowCard]}
         >
             <Pressable onPress={onPress} style={styles.trackRowHeader}>
-                <View style={[styles.rankBadge, { backgroundColor: Colors.primary + "20" }]}>
-                    <ThemedText style={{ color: Colors.primary, fontWeight: "bold" }}>
-                        #{index + 1}
-                    </ThemedText>
+                <View style={styles.imageContainer}>
+                    <Image
+                        source={{ uri: track.album?.image_url || "https://via.placeholder.com/60" }}
+                        style={styles.trackImage}
+                        contentFit="cover"
+                    />
+                    <View style={[styles.rankBadge, { backgroundColor: Colors.primary }]}>
+                        <ThemedText style={{
+                            color: "#FFF",
+                            fontWeight: "bold",
+                            fontSize: 10,
+                            textAlign: 'center',
+                            lineHeight: 12,
+                            width: '100%',
+                            includeFontPadding: false,
+                        }}>
+                            #{index + 1}
+                        </ThemedText>
+                    </View>
                 </View>
-
-                <Image
-                    source={{ uri: track.album?.image_url || "https://via.placeholder.com/60" }}
-                    style={styles.trackImage}
-                    contentFit="cover"
-                />
 
                 <View style={styles.trackInfo}>
                     <ThemedText type="defaultSemiBold" numberOfLines={1}>{track.name}</ThemedText>
@@ -58,8 +67,7 @@ export const TrackRow = ({
                 </View>
 
                 <View style={styles.trackStats}>
-                    <ThemedText type="defaultSemiBold">{track.playCount}</ThemedText>
-                    <ThemedText type="small" style={{ fontSize: 10, color: colors.icon }}>plays</ThemedText>
+                    <ThemedText type="defaultSemiBold">{track.totalStreams}</ThemedText>
                 </View>
 
                 <MaterialIcons
@@ -72,7 +80,7 @@ export const TrackRow = ({
             {isExpanded && (
                 <Animated.View
                     entering={FadeInDown.duration(300)}
-                    style={styles.expandedContent}
+                    style={[styles.expandedContent, { borderColor: colors.border }]}
                 >
                     <View style={styles.divider} />
                     <ThemedText type="small" style={{ marginBottom: 10, color: colors.icon }}>
@@ -98,7 +106,6 @@ export const TrackRow = ({
 
 const styles = StyleSheet.create({
     trackRowCard: {
-        borderRadius: 16,
         marginBottom: 12,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
@@ -109,17 +116,31 @@ const styles = StyleSheet.create({
     trackRowHeader: {
         flexDirection: "row",
         alignItems: "center",
-        padding: 16,
+        paddingVertical: 8,
+        paddingHorizontal: 8,
         gap: 12,
+        position: "relative",
     },
     rankBadge: {
-        borderRadius: 10,
+        position: "absolute",
+        top: -6,
+        left: -6,
+        width: 22,
+        height: 22,
+        borderRadius: 11,
         justifyContent: "center",
         alignItems: "center",
+        zIndex: 10,
+        borderWidth: 2,
+        borderColor: "#1E1E1E",
+    },
+    imageContainer: {
+        position: 'relative',
+        marginRight: 4,
     },
     trackImage: {
-        width: 48,
-        height: 48,
+        width: 64,
+        height: 64,
         borderRadius: 8,
     },
     trackInfo: {
@@ -130,12 +151,11 @@ const styles = StyleSheet.create({
         marginRight: 8,
     },
     expandedContent: {
-        paddingHorizontal: 16,
+        paddingHorizontal: 8,
         paddingBottom: 20,
     },
     divider: {
         height: 1,
-        backgroundColor: "rgba(150,150,150, 0.1)",
         marginBottom: 16,
     },
 });

@@ -106,7 +106,7 @@ public class AnalyticsController : ControllerBase
                     id = track.Id,
                     spotifyId = track.SpotifyId,
                     name = track.Name,
-                    playCount = top.PlayCount,
+                    totalStreams = top.PlayCount,
                     totalMinutes = Math.Round(top.TotalMsPlayed / 60000.0, 1),
                     artists = track.TrackArtists.Select(ta => ta.Artist.Name).ToArray(),
                     album = track.Album != null ? new
@@ -165,7 +165,7 @@ public class AnalyticsController : ControllerBase
                     spotifyId = artist.SpotifyId,
                     name = artist.Name,
                     imageUrl = artist.ImageUrl,
-                    playCount = top.PlayCount
+                    totalStreams = top.PlayCount
                 })
             .ToListAsync();
 
@@ -206,7 +206,8 @@ public class AnalyticsController : ControllerBase
             .OrderByDescending(x => x.PlayCount)
             .Take(limit)
             .Join(
-                _context.Albums,
+                _context.Albums
+                    .Include(a => a.Artist),
                 top => top.AlbumId,
                 album => album.Id,
                 (top, album) => new
@@ -214,8 +215,9 @@ public class AnalyticsController : ControllerBase
                     id = album.Id,
                     spotifyId = album.SpotifyId,
                     name = album.Name,
+                    artistName = album.Artist != null ? album.Artist.Name : "Unknown Artist",
                     imageUrl = album.ImageUrl,
-                    playCount = top.PlayCount
+                    totalStreams = top.PlayCount
                 })
             .ToListAsync();
 

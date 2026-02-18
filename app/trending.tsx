@@ -1,3 +1,21 @@
+import React, { useCallback, useEffect, useState } from "react";
+import {
+    View,
+    ScrollView,
+    StyleSheet,
+    LayoutAnimation,
+    Platform,
+    UIManager,
+    ActivityIndicator,
+    Pressable,
+    RefreshControl,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import { MaterialIcons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import Animated, { FadeInDown } from "react-native-reanimated";
+
 import { ThemedText } from "@/components/ui/themed-text";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -6,19 +24,19 @@ import trendingApi, {
     TrendingArtist,
     TrendingTrack,
 } from "@/services/trendingApi";
-import { MaterialIcons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
-import {
-    ActivityIndicator,
-    Image,
-    Pressable,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    View,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import analyticsApi, { ActivityPoint } from "@/services/analyticsApi";
+
+import { ArtistCard } from "@/components/analytics/ArtistCard";
+import { AlbumRow } from "@/components/analytics/AlbumRow";
+import { FilterPill } from "@/components/analytics/FilterPill";
+import { TrackRow } from "@/components/analytics/TrackRow";
+
+// Enable LayoutAnimation for Android
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+type TimeFrame = "7" | "30" | "90" | "0";
 
 export default function TrendingScreen() {
     const insets = useSafeAreaInsets();
@@ -26,29 +44,37 @@ export default function TrendingScreen() {
     const isDark = colorScheme === "dark";
     const colors = Colors[isDark ? "dark" : "light"];
 
+    const [timeFrame, setTimeFrame] = useState<TimeFrame>("7");
     const [trendingTracks, setTrendingTracks] = useState<TrendingTrack[]>([]);
     const [trendingArtists, setTrendingArtists] = useState<TrendingArtist[]>([]);
     const [trendingAlbums, setTrendingAlbums] = useState<TrendingAlbum[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
+    // Track Expansion State
+    const [expandedTrackId, setExpandedTrackId] = useState<number | null>(null);
+    const [trackHistory, setTrackHistory] = useState<Record<number, ActivityPoint[]>>({});
+    const [loadingHistoryId, setLoadingHistoryId] = useState<number | null>(null);
+
     const fetchData = useCallback(async () => {
+        setIsLoading(true);
         try {
+            const days = parseInt(timeFrame);
             const [tracks, artists, albums] = await Promise.all([
-                trendingApi.getTrendingTracks(10, 7),
-                trendingApi.getTrendingArtists(10, 7),
-                trendingApi.getTrendingAlbums(10, 7),
+                trendingApi.getTrendingTracks(10, days || 7),
+                trendingApi.getTrendingArtists(10, days || 7),
+                trendingApi.getTrendingAlbums(10, days || 7),
             ]);
             setTrendingTracks(tracks);
             setTrendingArtists(artists);
             setTrendingAlbums(albums);
-        } catch (error) {
-            console.error("Failed to fetch trending:", error);
+        } catch (e) {
+            console.error("Failed to fetch trending:", e);
         } finally {
-            setLoading(false);
+            setIsLoading(false);
             setRefreshing(false);
         }
-    }, []);
+    }, [timeFrame]);
 
     useEffect(() => {
         fetchData();
@@ -59,14 +85,48 @@ export default function TrendingScreen() {
         fetchData();
     };
 
-    if (loading) {
+    const handleTrackPress = async (trackId: number) => {
+        // Layout Animation for smooth expand/collapse
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
+        if (expandedTrackId === trackId) {
+            setExpandedTrackId(null);
+            return;
+        }
+
+        setExpandedTrackId(trackId);
+
+        // Fetch history if not cached
+        if (!trackHistory[trackId]) {
+            setLoadingHistoryId(trackId);
+            try {
+                // We use analyticsApi.getTrackHistory here for the visual effect
+                const history = await analyticsApi.getTrackHistory(trackId, parseInt(timeFrame) || 7);
+                setTrackHistory(prev => ({ ...prev, [trackId]: history }));
+            } catch (e) {
+                console.error("Failed to load history", e);
+            } finally {
+                setLoadingHistoryId(null);
+            }
+        }
+    };
+
+    const timeFrameOptions = [
+        { label: "7D", value: "7" as TimeFrame, fullLabel: "Last 7 Days" },
+        { label: "30D", value: "30" as TimeFrame, fullLabel: "Last 30 Days" },
+        { label: "90D", value: "90" as TimeFrame, fullLabel: "Last 3 Months" },
+        { label: "All", value: "0" as TimeFrame, fullLabel: "All Time" },
+    ];
+
+    if (isLoading && trendingTracks.length === 0) {
         return (
             <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
                 <ActivityIndicator size="large" color={Colors.primary} />
-                <ThemedText style={styles.loadingText}>Loading trending...</ThemedText>
             </View>
         );
     }
+
+    const currentLabel = timeFrameOptions.find(o => o.value === timeFrame)?.fullLabel || "Trending";
 
     const hasNoData =
         trendingTracks.length === 0 &&
@@ -75,29 +135,48 @@ export default function TrendingScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
+            {/* Background Gradient for Depth */}
+            <LinearGradient
+                colors={[Colors.primary + "10", "transparent"]}
+                style={StyleSheet.absoluteFill}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 0.3 }}
+            />
+
             <ScrollView
-                style={styles.scrollView}
-                contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
-                refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-                }
+                contentContainerStyle={{ paddingBottom: 100 }}
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={Colors.primary} />
+                }
             >
                 {/* Header */}
-                <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-                    <Pressable onPress={() => router.back()} style={styles.backButton}>
+                <Animated.View
+                    entering={FadeInDown.duration(600)}
+                    style={[styles.header, { paddingTop: insets.top + 20 }]}
+                >
+                    <Pressable onPress={() => router.back()} style={styles.backBtn}>
                         <MaterialIcons name="arrow-back" size={24} color={colors.text} />
                     </Pressable>
-                    <View style={styles.headerContent}>
-                        <ThemedText style={styles.title}>Trending</ThemedText>
-                        <ThemedText style={[styles.subtitle, { color: colors.icon }]}>
-                            What everyone's listening to
-                        </ThemedText>
+                    <View>
+                        <ThemedText type="title" style={{ fontSize: 34 }}>Trending</ThemedText>
+                        <ThemedText style={{ color: colors.icon }}>{currentLabel}</ThemedText>
                     </View>
+                </Animated.View>
+
+                {/* Filter Pills */}
+                <View style={styles.filterRow}>
+                    {timeFrameOptions.map((opt) => (
+                        <FilterPill
+                            key={opt.value}
+                            label={opt.label}
+                            isActive={timeFrame === opt.value}
+                            onPress={() => setTimeFrame(opt.value)}
+                        />
+                    ))}
                 </View>
 
-                {/* Empty State */}
-                {hasNoData && (
+                {hasNoData && !isLoading && (
                     <View style={styles.emptyState}>
                         <MaterialIcons name="trending-up" size={48} color={colors.icon} />
                         <ThemedText style={[styles.emptyText, { color: colors.icon }]}>
@@ -109,128 +188,56 @@ export default function TrendingScreen() {
                     </View>
                 )}
 
-                {/* Trending Tracks */}
-                {trendingTracks.length > 0 && (
-                    <View style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <MaterialIcons name="music-note" size={22} color={Colors.primary} />
-                            <ThemedText style={styles.sectionTitle}>Hot Tracks</ThemedText>
-                        </View>
-                        {trendingTracks.map((track, index) => (
-                            <Pressable
-                                key={track.id}
-                                style={[styles.listItem, { backgroundColor: colors.card }]}
-                                onPress={() => router.push(`/song/${track.spotifyId}` as any)}
-                            >
-                                <View style={[styles.rankBadge, { backgroundColor: Colors.primary + "20" }]}>
-                                    <ThemedText style={[styles.rank, { color: Colors.primary }]}>
-                                        {index + 1}
-                                    </ThemedText>
-                                </View>
-                                <Image
-                                    source={{ uri: track.album?.image_url || "https://via.placeholder.com/52" }}
-                                    style={styles.itemImage}
-                                />
-                                <View style={styles.itemInfo}>
-                                    <ThemedText style={styles.itemName} numberOfLines={1}>
-                                        {track.name}
-                                    </ThemedText>
-                                    <ThemedText style={[styles.itemSubtitle, { color: colors.icon }]} numberOfLines={1}>
-                                        {track.artists.join(", ")}
-                                    </ThemedText>
-                                </View>
-                                <View style={styles.statsContainer}>
-                                    <View style={styles.stat}>
-                                        <MaterialIcons name="people" size={14} color={colors.icon} />
-                                        <ThemedText style={[styles.statText, { color: colors.icon }]}>
-                                            {track.uniqueListeners}
-                                        </ThemedText>
-                                    </View>
-                                </View>
-                            </Pressable>
-                        ))}
-                    </View>
-                )}
-
-                {/* Trending Artists */}
+                {/* Top Artists - Horizontal */}
                 {trendingArtists.length > 0 && (
-                    <View style={styles.section}>
+                    <View style={styles.sectionContainer}>
                         <View style={styles.sectionHeader}>
-                            <MaterialIcons name="mic" size={22} color={Colors.primary} />
-                            <ThemedText style={styles.sectionTitle}>Popular Artists</ThemedText>
+                            <ThemedText type="subtitle" style={styles.sectionTitle}>Popular Artists</ThemedText>
+                            <MaterialIcons name="chevron-right" size={24} color={colors.icon} />
                         </View>
-                        {trendingArtists.map((artist, index) => (
-                            <Pressable
-                                key={artist.id}
-                                style={[styles.listItem, { backgroundColor: colors.card }]}
-                                onPress={() => router.push(`/artist/${artist.spotifyId}` as any)}
-                            >
-                                <View style={[styles.rankBadge, { backgroundColor: Colors.primary + "20" }]}>
-                                    <ThemedText style={[styles.rank, { color: Colors.primary }]}>
-                                        {index + 1}
-                                    </ThemedText>
-                                </View>
-                                <Image
-                                    source={{ uri: artist.imageUrl || "https://via.placeholder.com/52" }}
-                                    style={[styles.itemImage, styles.artistImage]}
-                                />
-                                <View style={styles.itemInfo}>
-                                    <ThemedText style={styles.itemName} numberOfLines={1}>
-                                        {artist.name}
-                                    </ThemedText>
-                                </View>
-                                <View style={styles.statsContainer}>
-                                    <View style={styles.stat}>
-                                        <MaterialIcons name="people" size={14} color={colors.icon} />
-                                        <ThemedText style={[styles.statText, { color: colors.icon }]}>
-                                            {artist.uniqueListeners}
-                                        </ThemedText>
-                                    </View>
-                                </View>
-                            </Pressable>
+
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.artistsScroll}
+                        >
+                            {trendingArtists.map((artist, i) => (
+                                <ArtistCard key={artist.id} artist={artist as any} index={i} />
+                            ))}
+                        </ScrollView>
+                    </View>
+                )}
+
+                {/* Top Tracks List */}
+                {trendingTracks.length > 0 && (
+                    <View style={styles.sectionContainer}>
+                        <ThemedText type="subtitle" style={styles.sectionTitle}>Hot Tracks</ThemedText>
+
+                        {trendingTracks.map((track, i) => (
+                            <TrackRow
+                                key={track.id}
+                                track={track as any}
+                                index={i}
+                                isExpanded={expandedTrackId === track.id}
+                                onPress={() => handleTrackPress(track.id)}
+                                historyData={trackHistory[track.id]}
+                                isLoadingHistory={loadingHistoryId === track.id}
+                            />
                         ))}
                     </View>
                 )}
 
-                {/* Trending Albums */}
+                {/* Top Albums List */}
                 {trendingAlbums.length > 0 && (
-                    <View style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <MaterialIcons name="album" size={22} color={Colors.primary} />
-                            <ThemedText style={styles.sectionTitle}>Top Albums</ThemedText>
-                        </View>
-                        {trendingAlbums.map((album, index) => (
-                            <Pressable
-                                key={album.id}
-                                style={[styles.listItem, { backgroundColor: colors.card }]}
-                                onPress={() => router.push(`/album/${album.spotifyId}` as any)}
-                            >
-                                <View style={[styles.rankBadge, { backgroundColor: Colors.primary + "20" }]}>
-                                    <ThemedText style={[styles.rank, { color: Colors.primary }]}>
-                                        {index + 1}
-                                    </ThemedText>
-                                </View>
-                                <Image
-                                    source={{ uri: album.imageUrl || "https://via.placeholder.com/52" }}
-                                    style={styles.itemImage}
-                                />
-                                <View style={styles.itemInfo}>
-                                    <ThemedText style={styles.itemName} numberOfLines={1}>
-                                        {album.name}
-                                    </ThemedText>
-                                </View>
-                                <View style={styles.statsContainer}>
-                                    <View style={styles.stat}>
-                                        <MaterialIcons name="people" size={14} color={colors.icon} />
-                                        <ThemedText style={[styles.statText, { color: colors.icon }]}>
-                                            {album.uniqueListeners}
-                                        </ThemedText>
-                                    </View>
-                                </View>
-                            </Pressable>
+                    <View style={styles.sectionContainer}>
+                        <ThemedText type="subtitle" style={styles.sectionTitle}>Top Albums</ThemedText>
+
+                        {trendingAlbums.map((album, i) => (
+                            <AlbumRow key={album.id} album={album as any} index={i} />
                         ))}
                     </View>
                 )}
+
             </ScrollView>
         </View>
     );
@@ -244,34 +251,44 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
     },
-    scrollView: {
-        flex: 1,
-    },
     header: {
-        paddingHorizontal: 16,
-        paddingBottom: 20,
+        paddingHorizontal: 20,
+        marginBottom: 20,
         flexDirection: "row",
         alignItems: "center",
-        gap: 12,
+        gap: 16,
     },
-    backButton: {
+    backBtn: {
         padding: 8,
-        marginLeft: -8,
+        borderRadius: 50,
+        backgroundColor: "rgba(0,0,0,0.05)",
     },
-    headerContent: {
-        flex: 1,
+    filterRow: {
+        flexDirection: "row",
+        paddingHorizontal: 20,
+        gap: 10,
+        marginBottom: 24,
     },
-    title: {
-        fontSize: 28,
-        fontWeight: "bold",
+    sectionContainer: {
+        paddingHorizontal: 20,
+        marginTop: 10,
+        marginBottom: 20,
     },
-    subtitle: {
-        fontSize: 14,
-        marginTop: 2,
+    sectionTitle: {
+        marginBottom: 16,
+        fontSize: 20,
+        fontWeight: '600',
     },
-    loadingText: {
-        marginTop: 12,
-        fontSize: 14,
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+        paddingRight: 10,
+    },
+    artistsScroll: {
+        paddingBottom: 10,
+        gap: 12,
     },
     emptyState: {
         alignItems: "center",
@@ -287,71 +304,5 @@ const styles = StyleSheet.create({
         fontSize: 14,
         textAlign: "center",
         marginTop: 8,
-    },
-    section: {
-        marginBottom: 28,
-    },
-    sectionHeader: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-        paddingHorizontal: 16,
-        marginBottom: 14,
-    },
-    sectionTitle: {
-        fontSize: 20,
-        fontWeight: "700",
-    },
-    listItem: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginHorizontal: 16,
-        marginBottom: 10,
-        padding: 12,
-        borderRadius: 14,
-    },
-    rankBadge: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        alignItems: "center",
-        justifyContent: "center",
-        marginRight: 10,
-    },
-    rank: {
-        fontSize: 13,
-        fontWeight: "bold",
-    },
-    itemImage: {
-        width: 52,
-        height: 52,
-        borderRadius: 8,
-    },
-    artistImage: {
-        borderRadius: 26,
-    },
-    itemInfo: {
-        flex: 1,
-        marginLeft: 12,
-    },
-    itemName: {
-        fontSize: 15,
-        fontWeight: "600",
-    },
-    itemSubtitle: {
-        fontSize: 13,
-        marginTop: 3,
-    },
-    statsContainer: {
-        marginLeft: 8,
-        alignItems: "flex-end",
-    },
-    stat: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 4,
-    },
-    statText: {
-        fontSize: 13,
     },
 });
