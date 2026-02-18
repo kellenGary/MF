@@ -1,12 +1,11 @@
-import { ThemedText } from "@/components/themed-text";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { ThemedText } from "@/components/ui/themed-text";
+import { useTheme } from "@/contexts/ThemeContext";
 import { ProfileData } from "@/services/profileApi";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
-import FollowButton from "./follow-button";
+import FollowButton from "../ui/follow-button";
 import SOTDProfile from "./sotd-profile";
 
 interface ProfileHeaderProps {
@@ -24,9 +23,7 @@ export default function ProfileHeader({
     userId,
     onFollowChange,
 }: ProfileHeaderProps) {
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === "dark";
-    const colors = Colors[isDark ? "dark" : "light"];
+    const { colors } = useTheme();
 
     return (
         <>

@@ -1,0 +1,68 @@
+import { ThemedText } from '@/components/ui/themed-text';
+import { Colors } from "@/constants/theme";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Pressable, StyleSheet } from "react-native";
+
+export default function FilterBubble({
+  filterName,
+  activeFilter,
+  setActiveFilter,
+}: {
+  filterName: string;
+  activeFilter: string;
+  setActiveFilter: (filter: string) => void;
+}) {
+  const isActive = filterName === activeFilter;
+  const { colors, isDark } = useTheme();
+
+  return (
+    <Pressable
+      onPress={() => setActiveFilter(filterName)}
+      style={({ pressed }) => [
+        styles.button,
+        isActive ? styles.buttonActive : { backgroundColor: colors.card },
+        pressed && styles.pressed,
+      ]}
+      accessibilityRole="button"
+      accessibilityState={{ selected: isActive }}
+    >
+      <ThemedText
+        style={[
+          styles.text,
+          isActive ? styles.textActive : { color: isDark ? Colors.dark.text : Colors.light.text },
+        ]}
+      >
+        {filterName}
+      </ThemedText>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  button: {
+    justifyContent: "center",
+    alignItems: "center",
+    width: "auto",
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginBottom: 8,
+    marginRight: 8
+  },
+  buttonActive: {
+    backgroundColor: "#007AFF",
+    borderColor: "#007AFF",
+  },
+  pressed: {
+    opacity: 0.85,
+  },
+  text: {
+    fontSize: 14,
+  },
+  textActive: {
+    color: "white",
+  },
+  textInactive: {
+    color: "black",
+  },
+});

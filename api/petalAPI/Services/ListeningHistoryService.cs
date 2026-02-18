@@ -244,6 +244,7 @@ public class ListeningHistoryService : IListeningHistoryService
                     Name = trackData.TryGetProperty("name", out var trackNameProp) ? trackNameProp.GetString() ?? "Unknown" : "Unknown",
                     DurationMs = trackData.TryGetProperty("duration_ms", out var durationProp) ? durationProp.GetInt32() : 0,
                     Explicit = trackData.TryGetProperty("explicit", out var explicitProp) && explicitProp.GetBoolean(),
+                    // Note: Spotify API no longer returns popularity — this will always be null for new tracks
                     Popularity = trackData.TryGetProperty("popularity", out var popProp) ? popProp.GetInt32() : null,
                     AlbumId = albumId
                 };
@@ -515,6 +516,7 @@ public class ListeningHistoryService : IListeningHistoryService
                     Name = track.TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? "Unknown" : "Unknown",
                     DurationMs = track.TryGetProperty("duration_ms", out var durationProp) ? durationProp.GetInt32() : 0,
                     Explicit = track.TryGetProperty("explicit", out var explicitProp) ? explicitProp.GetBoolean() : false,
+                    // Note: Spotify API no longer returns popularity — this will always be null for new tracks
                     Popularity = track.TryGetProperty("popularity", out var popularityProp) ? popularityProp.GetInt32() : null,
                     AlbumId = albumId
                 };
@@ -673,6 +675,22 @@ public class ListeningHistoryService : IListeningHistoryService
             
             // Save all changes together (track-artists + listening history)
             await _context.SaveChangesAsync();
+
+            // Trigger session detection for synced tracks
+            try
+            {
+                await _listeningSessionService.ProcessNewTrackAsync(
+                    userId,
+                    listeningHistory.Id,
+                    dbTrack.Id,
+                    playedAt,
+                    dbTrack.DurationMs);
+            }
+            catch (Exception sessionEx)
+            {
+                // Log but don't fail the main operation if session processing fails
+                _logger.LogWarning(sessionEx, "[ListeningHistory] Session processing failed for user {UserId} during sync", userId);
+            }
 
             _logger.LogInformation("[ListeningHistory] Added listening entry for user {UserId}, track {TrackName} ({SpotifyId})", 
                 userId, dbTrack.Name, spotifyId);

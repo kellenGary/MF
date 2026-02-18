@@ -18,7 +18,10 @@ public enum PostType
     SharedTrack = 10,
     SharedAlbum = 11,
     SharedPlaylist = 12,
-    SharedArtist = 13
+    SharedArtist = 13,
+    
+    // Repost of another post
+    Repost = 20
 }
 
 public enum PostVisibility
@@ -55,6 +58,7 @@ public class Post
     public ListeningSession? ListeningSession { get; set; }
 
     public DateTime CreatedAt { get; set; }
+    public DateTime? DeletedAt { get; set; }
     public PostVisibility Visibility { get; set; }
 
     /// <summary>
@@ -63,4 +67,16 @@ public class Post
     /// - Shared posts: caption text
     /// </summary>
     public string? MetadataJson { get; set; }
+    
+    /// <summary>
+    /// For Repost type posts, references the original post being reposted
+    /// </summary>
+    public int? OriginalPostId { get; set; }
+    public Post? OriginalPost { get; set; }
+    
+    /// <summary>
+    /// Collection of likes on this post
+    /// </summary>
+    public ICollection<PostLike> Likes { get; set; } = new List<PostLike>();
 }
+

@@ -13,4 +13,8 @@ public interface IPostService
     Task<Post> CreateSharedPlaylistPost(int userId, int playlistId, string? caption = null, PostVisibility visibility = PostVisibility.Public);
     Task<Post> CreateSharedArtistPost(int userId, int artistId, string? caption = null, PostVisibility visibility = PostVisibility.Public);
     Task<bool> DeletePost(int userId, int postId);
+    Task<bool> LikePost(int userId, int postId);
+    Task<bool> UnlikePost(int userId, int postId);
+    Task<Post?> RepostPost(int userId, int postId);
+    Task<bool> RemoveRepost(int userId, int postId);
 }
