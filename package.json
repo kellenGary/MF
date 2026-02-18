@@ -5,7 +5,7 @@
   "scripts": {
     "start": "expo start",
     "start:tunnel": "expo start --tunnel",
-    "start:home": "EXPO_PUBLIC_API_URL=http://192.168.68.106:5164 npm run start",
+    "start:home": "EXPO_PUBLIC_API_URL=http://192.168.68.127:5164 npm run start",
     "start:taproom": "EXPO_PUBLIC_API_URL=http://192.168.0.145:5164 npm run start",
     "api": "dotnet run --project api/petalAPI/PetalAPI.csproj --urls http://0.0.0.0:5164",
     "api:watch": "dotnet watch --project api/petalAPI/PetalAPI.csproj run --urls http://0.0.0.0:5164",
@@ -24,6 +24,7 @@
     "@react-navigation/native": "^7.1.8",
     "d3-force": "^3.0.0",
     "expo": "~54.0.31",
+    "expo-background-fetch": "^14.0.9",
     "expo-blur": "~15.0.8",
     "expo-constants": "~18.0.13",
     "expo-font": "~14.0.10",

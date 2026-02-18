@@ -219,13 +219,108 @@ public class PostService : IPostService
     /// </summary>
     public async Task<bool> DeletePost(int userId, int postId)
     {
-        var post = await _context.Posts.FirstOrDefaultAsync(p => p.Id == postId && p.UserId == userId);
+        var post = await _context.Posts.FirstOrDefaultAsync(p => p.Id == postId && p.UserId == userId && p.DeletedAt == null);
         if (post == null) return false;
 
-        _context.Posts.Remove(post);
+        post.DeletedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Deleted post {PostId} for user {UserId}", postId, userId);
+        _logger.LogInformation("Soft-deleted post {PostId} for user {UserId}", postId, userId);
+        return true;
+    }
+
+    /// <summary>
+    /// Like a post
+    /// </summary>
+    public async Task<bool> LikePost(int userId, int postId)
+    {
+        var existingLike = await _context.PostLikes
+            .FirstOrDefaultAsync(l => l.PostId == postId && l.UserId == userId);
+
+        if (existingLike != null) return true; // Already liked
+
+        // Ensure post exists
+        var post = await _context.Posts.FindAsync(postId);
+        if (post == null) return false;
+
+        var like = new PostLike
+        {
+            UserId = userId,
+            PostId = postId,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.PostLikes.Add(like);
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    /// <summary>
+    /// Unlike a post
+    /// </summary>
+    public async Task<bool> UnlikePost(int userId, int postId)
+    {
+        var existingLike = await _context.PostLikes
+            .FirstOrDefaultAsync(l => l.PostId == postId && l.UserId == userId);
+
+        if (existingLike == null) return true; // Already unliked (idempotent)
+
+        _context.PostLikes.Remove(existingLike);
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    /// <summary>
+    /// Repost a post
+    /// </summary>
+    public async Task<Post?> RepostPost(int userId, int postId)
+    {
+        // Check if already reposted
+        var existingRepost = await _context.Posts
+            .FirstOrDefaultAsync(p => p.Type == PostType.Repost && 
+                                      p.OriginalPostId == postId && 
+                                      p.UserId == userId && 
+                                      p.DeletedAt == null);
+
+        if (existingRepost != null) return existingRepost;
+
+        // Ensure original post exists
+        var originalPost = await _context.Posts.FindAsync(postId);
+        if (originalPost == null) return null;
+
+        var repost = new Post
+        {
+            UserId = userId,
+            Type = PostType.Repost,
+            OriginalPostId = postId,
+            CreatedAt = DateTime.UtcNow,
+            Visibility = PostVisibility.Public // Reposts usually public or match original? defaulting to Public
+        };
+
+        _context.Posts.Add(repost);
+        await _context.SaveChangesAsync();
+
+        return repost;
+    }
+
+    /// <summary>
+    /// Remove a repost
+    /// </summary>
+    public async Task<bool> RemoveRepost(int userId, int postId)
+    {
+        var repost = await _context.Posts
+            .FirstOrDefaultAsync(p => p.Type == PostType.Repost && 
+                                      p.OriginalPostId == postId && 
+                                      p.UserId == userId && 
+                                      p.DeletedAt == null);
+
+        if (repost == null) return false;
+
+        repost.DeletedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
         return true;
     }
 }

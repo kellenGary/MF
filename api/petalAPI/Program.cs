@@ -83,6 +83,9 @@ builder.Services.AddScoped<ISavedTracksSyncService, SavedTracksSyncService>();
 builder.Services.AddScoped<IPostService, PostService>();
 builder.Services.AddScoped<ISpotifyDataService, SpotifyDataService>();
 
+// Register background services
+builder.Services.AddHostedService<SpotifySyncBackgroundService>();
+
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var secretKey = jwtSettings["SecretKey"];
@@ -155,6 +158,27 @@ using (var scope = app.Services.CreateScope())
     catch (Exception ex)
     {
          Console.WriteLine($"Failed to apply caching columns: {ex.Message}");
+    }
+
+    // Apply migration for RecommendationDismissals table
+    try
+    {
+        var contentRoot = app.Environment.ContentRootPath;
+        var scriptPath = Path.Combine(contentRoot, "scripts", "add_recommendation_dismissals.sql");
+        if (File.Exists(scriptPath))
+        {
+            var tableExists = db.Database.SqlQueryRaw<string>("SELECT name FROM sqlite_master WHERE type='table' AND name='RecommendationDismissals'").ToList().Any();
+            if (!tableExists)
+            {
+                var sql = File.ReadAllText(scriptPath);
+                db.Database.ExecuteSqlRaw(sql);
+                Console.WriteLine("Applied RecommendationDismissals table migration.");
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+         Console.WriteLine($"Failed to apply RecommendationDismissals migration: {ex.Message}");
     }
 }
 
