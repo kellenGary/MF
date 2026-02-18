@@ -199,154 +199,161 @@ public class SpotifyArtistController : ControllerBase
             var accessToken = await _spotifyTokenService.GetValidAccessTokenAsync(userId);
             if (accessToken == null) return Unauthorized(new { error = "Spotify token expired" });
 
-            _ = Task.Run(async () =>
+            var client = _httpClientFactory.CreateClient("Spotify");
+            client.DefaultRequestHeaders.Authorization = 
+                new AuthenticationHeaderValue("Bearer", accessToken);
+
+            var allArtists = new List<JsonElement>();
+            string? after = null;
+
+            do
             {
-                try
+                var url = $"https://api.spotify.com/v1/me/following?type=artist&limit=50";
+                if (after != null) url += $"&after={after}";
+
+                var response = await client.GetAsync(url);
+                if (!response.IsSuccessStatusCode)
                 {
-                    using var scope = _serviceScopeFactory.CreateScope();
-                    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                    var httpClientFactory = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>();
-                    var logger = scope.ServiceProvider.GetRequiredService<ILogger<SpotifyArtistController>>();
-
-                    var client = httpClientFactory.CreateClient("Spotify");
-                    client.DefaultRequestHeaders.Authorization = 
-                        new AuthenticationHeaderValue("Bearer", accessToken);
-
-                    var allArtists = new List<JsonElement>();
-                    string? after = null;
-
-                    do
+                    var error = await response.Content.ReadAsStringAsync();
+                    _logger.LogError("Spotify API error fetching followed artists: {Error}", error);
+                    return StatusCode((int)response.StatusCode, new
                     {
-                        var url = $"https://api.spotify.com/v1/me/following?type=artist&limit=50";
-                        if (after != null) url += $"&after={after}";
+                        error = "Failed to fetch followed artists from Spotify",
+                        statusCode = (int)response.StatusCode,
+                        spotifyError = error
+                    });
+                }
 
-                        var response = await client.GetAsync(url);
-                        if (!response.IsSuccessStatusCode) break;
+                var content = await response.Content.ReadAsStringAsync();
+                var data = JsonSerializer.Deserialize<JsonElement>(content);
 
-                        var content = await response.Content.ReadAsStringAsync();
-                        var data = JsonSerializer.Deserialize<JsonElement>(content);
-
-                        if (data.TryGetProperty("artists", out var artistsWrapper) &&
-                            artistsWrapper.TryGetProperty("items", out var items))
-                        {
-                            foreach (var item in items.EnumerateArray())
-                            {
-                                allArtists.Add(item);
-                            }
-
-                            // Get cursor for next page
-                            if (artistsWrapper.TryGetProperty("cursors", out var cursors) &&
-                                cursors.TryGetProperty("after", out var afterCursor))
-                            {
-                                after = afterCursor.GetString();
-                            }
-                            else
-                            {
-                                after = null;
-                            }
-                        }
-                        else
-                        {
-                            break;
-                        }
-                    } while (after != null);
-
-                    logger.LogInformation("Syncing {Count} followed artists for user {UserId}", allArtists.Count, userId);
-
-                    // Get existing followed artist IDs to detect unfollows
-                    var existingFollows = await dbContext.UserFollowedArtists
-                        .Where(ufa => ufa.UserId == userId)
-                        .Select(ufa => ufa.Artist.SpotifyId)
-                        .ToListAsync();
-
-                    var spotifyArtistIds = new HashSet<string>();
-
-                    foreach (var artistJson in allArtists)
+                if (data.TryGetProperty("artists", out var artistsWrapper) &&
+                    artistsWrapper.TryGetProperty("items", out var items))
+                {
+                    foreach (var item in items.EnumerateArray())
                     {
-                        var spotifyId = artistJson.GetProperty("id").GetString()!;
-                        spotifyArtistIds.Add(spotifyId);
-
-                        var name = artistJson.GetProperty("name").GetString()!;
-                        var imageUrl = artistJson.TryGetProperty("images", out var images) && 
-                                       images.GetArrayLength() > 0
-                            ? images[0].GetProperty("url").GetString()
-                            : null;
-                        // Note: Spotify API no longer returns popularity — this will always be null
-                        var popularity = artistJson.TryGetProperty("popularity", out var pop) 
-                            ? pop.GetInt32() 
-                            : (int?)null;
-                        var genres = artistJson.TryGetProperty("genres", out var genresArr)
-                            ? JsonSerializer.Serialize(genresArr)
-                            : null;
-
-                        // Upsert artist
-                        var artist = await dbContext.Artists.FirstOrDefaultAsync(a => a.SpotifyId == spotifyId);
-                        if (artist == null)
-                        {
-                            artist = new Artist
-                            {
-                                SpotifyId = spotifyId,
-                                Name = name,
-                                ImageUrl = imageUrl,
-                                Popularity = popularity,
-                                GenresJson = genres
-                            };
-                            dbContext.Artists.Add(artist);
-                            await dbContext.SaveChangesAsync();
-                        }
-                        else
-                        {
-                            artist.Name = name;
-                            artist.ImageUrl = imageUrl;
-                            artist.Popularity = popularity;
-                            artist.GenresJson = genres;
-                        }
-
-                        // Check if already following
-                        var existingFollow = await dbContext.UserFollowedArtists
-                            .FirstOrDefaultAsync(ufa => ufa.UserId == userId && ufa.ArtistId == artist.Id);
-
-                        if (existingFollow == null)
-                        {
-                            dbContext.UserFollowedArtists.Add(new UserFollowedArtist
-                            {
-                                UserId = userId,
-                                ArtistId = artist.Id,
-                                FollowedAt = DateTime.UtcNow
-                            });
-                        }
+                        allArtists.Add(item);
                     }
 
-                    // Remove unfollowed artists
-                    var artistsToUnfollow = existingFollows.Where(id => !spotifyArtistIds.Contains(id)).ToList();
-                    if (artistsToUnfollow.Any())
+                    // Get cursor for next page
+                    if (artistsWrapper.TryGetProperty("cursors", out var cursors) &&
+                        cursors.TryGetProperty("after", out var afterCursor))
                     {
-                        var artistIds = await dbContext.Artists
-                            .Where(a => artistsToUnfollow.Contains(a.SpotifyId))
-                            .Select(a => a.Id)
-                            .ToListAsync();
-
-                        var followsToRemove = await dbContext.UserFollowedArtists
-                            .Where(ufa => ufa.UserId == userId && artistIds.Contains(ufa.ArtistId))
-                            .ToListAsync();
-
-                        dbContext.UserFollowedArtists.RemoveRange(followsToRemove);
+                        after = afterCursor.GetString();
                     }
-
-                    await dbContext.SaveChangesAsync();
-                    logger.LogInformation("Completed syncing followed artists for user {UserId}", userId);
+                    else
+                    {
+                        after = null;
+                    }
                 }
-                catch (Exception bgEx)
+                else
                 {
-                    _logger.LogError(bgEx, "[Background] Error syncing followed artists for user {UserId}", userId);
+                    break;
                 }
+            } while (after != null);
+
+            _logger.LogInformation("Syncing {Count} followed artists for user {UserId}", allArtists.Count, userId);
+
+            // Get existing followed artist IDs to detect unfollows
+            var existingFollows = await _dbContext.UserFollowedArtists
+                .Where(ufa => ufa.UserId == userId)
+                .Select(ufa => ufa.Artist.SpotifyId)
+                .ToListAsync();
+
+            var spotifyArtistIds = new HashSet<string>();
+            int artistsAdded = 0;
+
+            foreach (var artistJson in allArtists)
+            {
+                var spotifyId = artistJson.GetProperty("id").GetString()!;
+                spotifyArtistIds.Add(spotifyId);
+
+                var name = artistJson.GetProperty("name").GetString()!;
+                var imageUrl = artistJson.TryGetProperty("images", out var images) && 
+                               images.GetArrayLength() > 0
+                    ? images[0].GetProperty("url").GetString()
+                    : null;
+                // Note: Spotify API no longer returns popularity — this will always be null
+                var popularity = artistJson.TryGetProperty("popularity", out var pop) 
+                    ? pop.GetInt32() 
+                    : (int?)null;
+                var genres = artistJson.TryGetProperty("genres", out var genresArr)
+                    ? JsonSerializer.Serialize(genresArr)
+                    : null;
+
+                // Upsert artist
+                var artist = await _dbContext.Artists.FirstOrDefaultAsync(a => a.SpotifyId == spotifyId);
+                if (artist == null)
+                {
+                    artist = new Artist
+                    {
+                        SpotifyId = spotifyId,
+                        Name = name,
+                        ImageUrl = imageUrl,
+                        Popularity = popularity,
+                        GenresJson = genres
+                    };
+                    _dbContext.Artists.Add(artist);
+                    await _dbContext.SaveChangesAsync();
+                }
+                else
+                {
+                    artist.Name = name;
+                    artist.ImageUrl = imageUrl;
+                    artist.Popularity = popularity;
+                    artist.GenresJson = genres;
+                }
+
+                // Check if already following
+                var existingFollow = await _dbContext.UserFollowedArtists
+                    .FirstOrDefaultAsync(ufa => ufa.UserId == userId && ufa.ArtistId == artist.Id);
+
+                if (existingFollow == null)
+                {
+                    _dbContext.UserFollowedArtists.Add(new UserFollowedArtist
+                    {
+                        UserId = userId,
+                        ArtistId = artist.Id,
+                        FollowedAt = DateTime.UtcNow
+                    });
+                    artistsAdded++;
+                }
+            }
+
+            // Remove unfollowed artists
+            int artistsRemoved = 0;
+            var artistsToUnfollow = existingFollows.Where(id => !spotifyArtistIds.Contains(id)).ToList();
+            if (artistsToUnfollow.Any())
+            {
+                var artistIds = await _dbContext.Artists
+                    .Where(a => artistsToUnfollow.Contains(a.SpotifyId))
+                    .Select(a => a.Id)
+                    .ToListAsync();
+
+                var followsToRemove = await _dbContext.UserFollowedArtists
+                    .Where(ufa => ufa.UserId == userId && artistIds.Contains(ufa.ArtistId))
+                    .ToListAsync();
+
+                artistsRemoved = followsToRemove.Count;
+                _dbContext.UserFollowedArtists.RemoveRange(followsToRemove);
+            }
+
+            await _dbContext.SaveChangesAsync();
+            _logger.LogInformation("Completed syncing followed artists for user {UserId}: {Added} added, {Removed} removed, {Total} total",
+                userId, artistsAdded, artistsRemoved, allArtists.Count);
+
+            return Ok(new
+            {
+                success = true,
+                artistsAdded,
+                artistsRemoved,
+                totalFollowedArtists = allArtists.Count,
+                syncedAt = DateTime.UtcNow.ToString("o")
             });
-
-            return Accepted(new { message = "Followed artists sync started in background" });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error starting followed artists sync");
+            _logger.LogError(ex, "Error syncing followed artists");
             return StatusCode(500, new { error = "Internal server error", message = ex.Message });
         }
     }

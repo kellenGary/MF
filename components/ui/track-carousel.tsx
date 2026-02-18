@@ -370,9 +370,8 @@ function StackedAlbumCard({
 
 const styles = StyleSheet.create({
     carouselContainer: {
-        height: CARD_HEIGHT + 40,
+        height: CARD_HEIGHT,
         overflow: "visible",
-        paddingVertical: 20,
     },
     carouselTrack: {
         flexDirection: "row",

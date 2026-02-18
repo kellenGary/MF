@@ -17,6 +17,7 @@ export const SCOPES = [
   "user-read-email",
   "user-read-recently-played",
   "user-library-read",
+  "user-library-modify",
   "user-top-read",
   "playlist-read-private",
   "playlist-read-collaborative",
@@ -25,4 +26,6 @@ export const SCOPES = [
   "user-modify-playback-state",
   "user-read-playback-state",
   "user-read-currently-playing",
+  "user-follow-read",
+  "user-follow-modify",
 ].join(" ");

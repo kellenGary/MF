@@ -106,7 +106,7 @@ export default function ForYouCard({ onLoad }: ForYouCardProps) {
     }
 
     return (
-        <View style={[styles.container, { backgroundColor: colors.card }]}>
+        <View style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
                 <View style={styles.headerLeft}>
@@ -122,9 +122,6 @@ export default function ForYouCard({ onLoad }: ForYouCardProps) {
                         For You
                     </ThemedText>
                 </View>
-                <ThemedText style={[styles.headerSubtitle, { color: colors.icon }]}>
-                    Personalized picks
-                </ThemedText>
             </View>
 
             {/* Horizontal Carousel */}
@@ -193,6 +190,8 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         paddingVertical: 16,
         marginBottom: 8,
+        paddingHorizontal: 0,
+        marginHorizontal: -16,
     },
     loadingContainer: {
         alignItems: "center",
@@ -208,8 +207,8 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        paddingHorizontal: 16,
         marginBottom: 16,
+        paddingHorizontal: 16,
     },
     headerLeft: {
         flexDirection: "row",
@@ -231,8 +230,8 @@ const styles = StyleSheet.create({
         fontSize: 13,
     },
     carouselContent: {
-        paddingHorizontal: 16,
         gap: CARD_GAP,
+        paddingHorizontal: 16,
     },
     trackCard: {
         width: CARD_WIDTH,

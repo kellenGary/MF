@@ -28,8 +28,8 @@ export default function PostScreen() {
   const colors = Colors[isDark ? "dark" : "light"];
   const { isAuthenticated } = useAuth();
 
-  const filters = ["Recent Song", "Liked Song", "Album", "Playlist", "Artist"];
-  const [activeFilter, setActiveFilter] = useState("Recent Song");
+  const filters = ["Recent", "Liked", "Albums", "Playlists", "Artists"];
+  const [activeFilter, setActiveFilter] = useState("Recent");
   const [searchQuery, setSearchQuery] = useState("");
 
   // Data provided by shared hook
@@ -63,19 +63,19 @@ export default function PostScreen() {
     setSearchQuery(""); // Clear search
 
     switch (activeFilter) {
-      case "Recent Song":
+      case "Recent":
         fetchRecentTracks(PAGE_SIZE, 0);
         break;
-      case "Liked Song":
+      case "Liked":
         fetchLikedTracks(PAGE_SIZE, 0);
         break;
-      case "Album":
+      case "Albums":
         fetchLikedAlbums(PAGE_SIZE, 0);
         break;
-      case "Playlist":
+      case "Playlists":
         fetchPlaylists();
         break;
-      case "Artist":
+      case "Artists":
         fetchFollowedArtists(PAGE_SIZE, 0);
         break;
     }
@@ -116,6 +116,15 @@ export default function PostScreen() {
     });
   };
 
+  const EmptyState = ({ message, icon }: { message: string, icon: keyof typeof MaterialIcons.glyphMap }) => (
+    <View style={styles.emptyContainer}>
+      <MaterialIcons name={icon} size={64} color={colors.text} style={styles.emptyIcon} />
+      <ThemedText style={[styles.emptyText, { color: colors.text }]}>
+        {message}
+      </ThemedText>
+    </View>
+  );
+
   const renderContent = () => {
     if (isLoading) {
       return (
@@ -129,7 +138,7 @@ export default function PostScreen() {
     }
 
     switch (activeFilter) {
-      case "Recent Song":
+      case "Recent":
         const filteredSongs = searchItems(
           recentTracks,
           ["name", "artistNames"],
@@ -161,11 +170,9 @@ export default function PostScreen() {
             );
           })
         ) : (
-          <ThemedText style={[styles.emptyText, { color: colors.text }]}>
-            No recent songs found
-          </ThemedText>
+          <EmptyState message="No recent songs found" icon="history" />
         );
-      case "Liked Song":
+      case "Liked":
         const filteredLikedSongs = searchItems(
           likedTracks,
           ["name", "artistNames"],
@@ -197,12 +204,10 @@ export default function PostScreen() {
             );
           })
         ) : (
-          <ThemedText style={[styles.emptyText, { color: colors.text }]}>
-            No liked songs found
-          </ThemedText>
+          <EmptyState message="No liked songs found" icon="favorite-border" />
         );
 
-      case "Album":
+      case "Albums":
         const filteredAlbums = searchItems(
           likedAlbums,
           ["album.name"],
@@ -237,12 +242,10 @@ export default function PostScreen() {
             );
           })
         ) : (
-          <ThemedText style={[styles.emptyText, { color: colors.text }]}>
-            No liked albums found
-          </ThemedText>
+          <EmptyState message="No liked albums found" icon="album" />
         );
 
-      case "Playlist":
+      case "Playlists":
         const filteredPlaylists = searchItems(
           userPlaylists,
           ["name"],
@@ -274,12 +277,10 @@ export default function PostScreen() {
             );
           })
         ) : (
-          <ThemedText style={[styles.emptyText, { color: colors.text }]}>
-            No playlists found
-          </ThemedText>
+          <EmptyState message="No playlists found" icon="playlist-play" />
         );
 
-      case "Artist":
+      case "Artists":
         const filteredArtists = searchItems(
           followedArtists,
           ["artist.name"],
@@ -314,9 +315,7 @@ export default function PostScreen() {
             );
           })
         ) : (
-          <ThemedText style={[styles.emptyText, { color: colors.text }]}>
-            No followed artists found
-          </ThemedText>
+          <EmptyState message="No followed artists found" icon="person-outline" />
         );
 
       default:
@@ -372,6 +371,7 @@ export default function PostScreen() {
       {/* Content List */}
       <ScrollView
         style={styles.listContainer}
+        contentContainerStyle={{ flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
       >
         {renderContent()}
@@ -395,13 +395,14 @@ const styles = StyleSheet.create({
     width: "100%",
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    marginLeft: 4,
   },
 
   listContainer: {
     flex: 1,
+    paddingHorizontal: 8,
   },
   loadingContainer: {
     flex: 1,
@@ -413,11 +414,20 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
   },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    minHeight: 300,
+  },
+  emptyIcon: {
+    opacity: 0.5,
+    marginBottom: 16,
+  },
   emptyText: {
-    textAlign: "center",
-    marginTop: 40,
     fontSize: 16,
     opacity: 0.7,
+    textAlign: "center",
   },
   bottomBar: {
     backgroundColor: "transparent",

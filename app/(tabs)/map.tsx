@@ -3,6 +3,7 @@ import {
   ClusteredMarker,
   clusterMarkers,
 } from "@/components/ui/map";
+import SearchBar from "@/components/ui/search-bar";
 import { ThemedText } from '@/components/ui/themed-text';
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
@@ -97,13 +98,42 @@ export default function MapScreen() {
     fetchLocationHistory();
   }, [isAuthenticated]);
 
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Filter history items based on search query
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return historyItems;
+
+    const query = searchQuery.toLowerCase().trim();
+    return historyItems.filter((item) => {
+      const trackName = item.track.name.toLowerCase();
+      const artistNames = item.track.artists
+        .map((a) => a.name.toLowerCase())
+        .join(" ");
+      const albumName = item.track.album?.name.toLowerCase() || "";
+      const userName = item.user.display_name.toLowerCase();
+
+      return (
+        trackName.includes(query) ||
+        artistNames.includes(query) ||
+        albumName.includes(query) ||
+        userName.includes(query)
+      );
+    });
+  }, [historyItems, searchQuery]);
+
   // Memoize clustered markers based on region zoom level
   const clusteredMarkers = useMemo(() => {
     if (!region) return [];
     // Adjust cluster radius based on zoom level - smaller radius when zoomed in
     const clusterRadius = Math.max(region.latitudeDelta * 0.03, 0.0005);
-    return clusterMarkers(historyItems, region, clusterRadius);
-  }, [historyItems, region?.latitudeDelta]);
+    return clusterMarkers(
+      filteredItems,
+      region,
+      clusterRadius,
+      (item) => item.track.id
+    );
+  }, [filteredItems, region?.latitudeDelta]);
 
   const mapRef = React.useRef<MapView>(null);
   const handleMarkerPress = useCallback(
@@ -118,12 +148,19 @@ export default function MapScreen() {
         longitudeDelta: 0.005,
       }, 500); // 500ms animation duration
 
+      // Filter out duplicate songs based on track.id
+      const uniqueItems = cluster.items.filter((item, index, self) =>
+        index === self.findIndex((t) => (
+          t.track.id === item.track.id
+        ))
+      );
+
       // Navigate to location history sheet
       router.push({
         pathname: "/location-history",
         params: {
-          items: JSON.stringify(cluster.items),
-          count: cluster.count.toString(),
+          items: JSON.stringify(uniqueItems),
+          count: uniqueItems.length.toString(),
         },
       } as any);
     },
@@ -184,27 +221,41 @@ export default function MapScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {region && (
-        <MapView
-          ref={mapRef}
-          style={styles.map}
-          initialRegion={region}
-          onRegionChangeComplete={handleRegionChange}
-          showsUserLocation
-          showsMyLocationButton
-          showsPointsOfInterest={false}
-          showsBuildings={false}
-          userInterfaceStyle={isDark ? "dark" : "light"}
-          moveOnMarkerPress={false}
-        >
-          {clusteredMarkers.map((cluster) => (
-            <ClusteredMapMarker
-              key={cluster.id}
-              cluster={cluster}
-              onPress={handleMarkerPress}
-              getImageUrl={getImageUrl}
-            />
-          ))}
-        </MapView>
+        <>
+          <MapView
+            ref={mapRef}
+            style={styles.map}
+            initialRegion={region}
+            onRegionChangeComplete={handleRegionChange}
+            showsUserLocation
+            showsMyLocationButton
+            showsPointsOfInterest={false}
+            showsBuildings={false}
+            userInterfaceStyle={isDark ? "dark" : "light"}
+            moveOnMarkerPress={false}
+          >
+            {clusteredMarkers.map((cluster) => (
+              <ClusteredMapMarker
+                key={cluster.id}
+                cluster={cluster}
+                onPress={handleMarkerPress}
+                getImageUrl={getImageUrl}
+              />
+            ))}
+          </MapView>
+
+          <SearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search songs, artists, or users..."
+            containerStyle={{
+              position: 'absolute',
+              top: insets.top + 10,
+              left: 16,
+              right: 16,
+            }}
+          />
+        </>
       )}
     </View>
   );
@@ -213,6 +264,7 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    position: "relative",
   },
   centerContent: {
     justifyContent: "center",

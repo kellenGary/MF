@@ -2,14 +2,18 @@ import FeedItemRouter from "@/components/ui/posts/feed-item-router";
 import { useScrollContext } from "@/contexts/ScrollContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import useFeed from "@/hooks/useFeed";
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import React, { useCallback } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Pressable,
   RefreshControl,
   StyleSheet,
   View,
 } from "react-native";
+import { ThemedText } from "../ui/themed-text";
 
 type FeedProps = {
   ListHeaderComponent?: React.ReactNode | null;
@@ -36,7 +40,28 @@ export default function Feed({ ListHeaderComponent = null }: FeedProps) {
 
   const renderEmpty = () => (
     <View style={styles.empty}>
-      {/* keep the message minimal; the parent screen can replace if needed */}
+      <View style={[styles.emptyIconWrap]}>
+        <Ionicons name="compass-outline" size={48} color={colors.mutedForeground} />
+      </View>
+      <ThemedText type="subtitle" style={{ marginBottom: 8 }}>
+        Your feed is empty
+      </ThemedText>
+      <ThemedText
+        type="small"
+        style={{ color: colors.mutedForeground, textAlign: "center", marginBottom: 16 }}
+      >
+        Follow some people to see their posts here.{"\n"}
+        Discover new friends on the Explore page!
+      </ThemedText>
+      <Pressable
+        style={[styles.emptyButton, { backgroundColor: colors.accent }]}
+        onPress={() => router.push("/(tabs)/explore")}
+      >
+        <Ionicons name="search" size={18} color={colors.accentForeground} />
+        <ThemedText type="defaultSemiBold" style={{ color: colors.accentForeground }}>
+          Explore
+        </ThemedText>
+      </Pressable>
     </View>
   );
 
@@ -75,7 +100,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   empty: {
-    padding: 32,
+    paddingVertical: 64,
+    paddingHorizontal: 32,
     alignItems: "center",
+  },
+  emptyIconWrap: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 24,
   },
 });

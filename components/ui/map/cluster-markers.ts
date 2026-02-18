@@ -33,6 +33,7 @@ export function clusterMarkers<T extends ClusterableItem>(
   items: T[],
   region: Region | null,
   clusterRadius: number = 0.002,
+  getUniqueId?: (item: T) => string | number,
 ): ClusteredMarker<T>[] {
   if (!region || items.length === 0) return [];
 
@@ -63,11 +64,17 @@ export function clusterMarkers<T extends ClusterableItem>(
     const avgLng =
       nearby.reduce((sum, n) => sum + n.longitude, 0) / nearby.length;
 
+    let count = nearby.length;
+    if (getUniqueId) {
+      const uniqueIds = new Set(nearby.map(getUniqueId));
+      count = uniqueIds.size;
+    }
+
     clusters.push({
       id: `cluster-${item.id}`,
       latitude: avgLat,
       longitude: avgLng,
-      count: nearby.length,
+      count,
       items: nearby,
     });
   }
