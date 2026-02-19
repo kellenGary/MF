@@ -66,7 +66,7 @@ public class DbController : ControllerBase
         {
             var rows = await _context.Database
                 .SqlQueryRaw<Models.DTOs.TrackDetailsViewRow>(@"
-                    SELECT TrackId, TrackSpotifyId, TrackName, DurationMs, ""Explicit"", Popularity,
+                    SELECT TrackId, TrackSpotifyId, TrackName, DurationMs, ""Explicit"",
                            AlbumId, AlbumSpotifyId, AlbumName, AlbumImageUrl, AlbumReleaseDate,
                            ArtistId, ArtistSpotifyId, ArtistName, ArtistOrder
                     FROM TrackDetailsWithArtists
@@ -89,7 +89,6 @@ public class DbController : ControllerBase
                         name = first.TrackName,
                         duration_ms = first.DurationMs,
                         @explicit = first.Explicit,
-                        popularity = first.Popularity,
                         album = first.AlbumId == null ? null : new
                         {
                             id = first.AlbumId,

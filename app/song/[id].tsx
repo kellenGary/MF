@@ -392,32 +392,7 @@ export default function SongModal() {
                 </ThemedText>
               </View>
             )}
-            {song?.popularity !== undefined && (
-              <View style={styles.statRow}>
-                <MaterialIcons
-                  name="trending-up"
-                  size={18}
-                  color={colors.icon}
-                />
-                <ThemedText style={[styles.statLabel, { color: colors.text }]}>
-                  Popularity
-                </ThemedText>
-                <View style={styles.popularityBar}>
-                  <View
-                    style={[
-                      styles.popularityFill,
-                      {
-                        width: `${song.popularity}%`,
-                        backgroundColor: Colors.primary,
-                      },
-                    ]}
-                  />
-                </View>
-                <ThemedText style={[styles.statValue, { color: colors.text }]}>
-                  {song.popularity}
-                </ThemedText>
-              </View>
-            )}
+
           </View>
         </View>
       </View>
@@ -598,15 +573,5 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "right",
   },
-  popularityBar: {
-    flex: 1,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "rgba(128,128,128,0.2)",
-    overflow: "hidden",
-  },
-  popularityFill: {
-    height: 6,
-    borderRadius: 3,
-  },
+
 });

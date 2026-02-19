@@ -627,7 +627,7 @@ public class UserDataController : ControllerBase
                 .SqlQueryRaw<LikedTrackViewRow>(@"
                     SELECT 
                         UserId, LikedAt, TrackId, TrackSpotifyId, TrackName, 
-                        DurationMs, ""Explicit"", Popularity, Isrc,
+                        DurationMs, ""Explicit"", Isrc,
                         AlbumId, AlbumSpotifyId, AlbumName, AlbumImageUrl, AlbumReleaseDate, AlbumType,
                         ArtistId, ArtistSpotifyId, ArtistName, ArtistOrder
                     FROM UserLikedTracksEnriched 
@@ -650,7 +650,6 @@ public class UserDataController : ControllerBase
                         name = g.First().TrackName,
                         durationMs = g.First().DurationMs,
                         @explicit = g.First().Explicit,
-                        popularity = g.First().Popularity,
                         isrc = g.First().Isrc,
                         artists = g.Where(x => x.ArtistSpotifyId != null)
                             .OrderBy(x => x.ArtistOrder)
@@ -955,8 +954,7 @@ public class UserDataController : ControllerBase
                     {
                         id = ufa.Artist.SpotifyId,
                         name = ufa.Artist.Name,
-                        imageUrl = ufa.Artist.ImageUrl,
-                        popularity = ufa.Artist.Popularity
+                        imageUrl = ufa.Artist.ImageUrl
                     }
                 })
                 .ToListAsync();

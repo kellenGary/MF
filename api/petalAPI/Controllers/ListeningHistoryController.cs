@@ -269,7 +269,6 @@ public class ListeningHistoryController : ControllerBase
                     name = h.TrackName,
                     duration_ms = h.DurationMs,
                     @explicit = h.Explicit,
-                    popularity = h.Popularity,
                     album = h.AlbumId.HasValue ? new
                     {
                         id = h.AlbumId.Value,
@@ -529,7 +528,6 @@ public class ListeningHistoryController : ControllerBase
                     name = h.TrackName,
                     duration_ms = h.DurationMs,
                     @explicit = h.Explicit,
-                    popularity = h.Popularity,
                     album = h.AlbumId.HasValue ? new
                     {
                         id = h.AlbumId.Value,
