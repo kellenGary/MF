@@ -482,10 +482,6 @@ public class PlaylistSyncService : IPlaylistSyncService
                 : 0,
             Explicit = trackElement.TryGetProperty("explicit", out var explicitProp) 
                 && explicitProp.GetBoolean(),
-            // Note: Spotify API no longer returns popularity — this will always be null for new tracks
-            Popularity = trackElement.TryGetProperty("popularity", out var popularityProp) 
-                ? popularityProp.GetInt32() 
-                : null,
             // Note: Spotify API no longer returns external_ids — ISRC will always be null for new tracks
             Isrc = trackElement.TryGetProperty("external_ids", out var externalIds) &&
                    externalIds.TryGetProperty("isrc", out var isrcProp)

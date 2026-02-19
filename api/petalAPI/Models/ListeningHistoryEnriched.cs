@@ -20,7 +20,6 @@ public class ListeningHistoryEnriched
     public string TrackName { get; set; } = default!;
     public int DurationMs { get; set; }
     public bool Explicit { get; set; }
-    public int? Popularity { get; set; }
     
     // Album fields
     public int? AlbumId { get; set; }
