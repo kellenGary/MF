@@ -207,7 +207,9 @@ public class AnalyticsController : ControllerBase
             .Take(limit)
             .Join(
                 _context.Albums
-                    .Include(a => a.Artist),
+                    .Include(a => a.Tracks)
+                        .ThenInclude(t => t.TrackArtists)
+                            .ThenInclude(ta => ta.Artist),
                 top => top.AlbumId,
                 album => album.Id,
                 (top, album) => new
@@ -215,7 +217,7 @@ public class AnalyticsController : ControllerBase
                     id = album.Id,
                     spotifyId = album.SpotifyId,
                     name = album.Name,
-                    artistName = album.Artist != null ? album.Artist.Name : "Unknown Artist",
+                    artistName = album.Tracks.SelectMany(t => t.TrackArtists).Select(ta => ta.Artist.Name).FirstOrDefault() ?? "Unknown Artist",
                     imageUrl = album.ImageUrl,
                     totalStreams = top.PlayCount
                 })
