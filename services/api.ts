@@ -18,6 +18,7 @@ export interface User {
   email: string | null;
   profileImageUrl: string | null;
   hasCompletedProfile: boolean;
+  isSessionJoinable: boolean;
 }
 
 export interface AuthResponse {
@@ -109,14 +110,28 @@ class ApiService {
       },
     });
 
-    // If unauthorized, clear token and trigger handler ONLY ONCE
-    if (response.status === 401) {
-      if (!this.isHandlingUnauthorized) {
-        this.isHandlingUnauthorized = true;
-        if (this.onUnauthorized) {
-          this.onUnauthorized();
+    if (!response.ok) {
+      if (response.status === 401) {
+        if (!this.isHandlingUnauthorized) {
+          this.isHandlingUnauthorized = true;
+          if (this.onUnauthorized) {
+            this.onUnauthorized();
+          }
         }
+        throw new Error("Unauthorized");
       }
+
+      const text = await response.text();
+      let errorMessage = `Request failed with status ${response.status}`;
+      try {
+        const json = JSON.parse(text);
+        if (json.error) errorMessage = json.error;
+        else if (json.message) errorMessage = json.message;
+      } catch (e) {
+        // If not JSON, use the status text or truncate the body
+        errorMessage = `Request failed: ${response.status} ${response.statusText}`;
+      }
+      throw new Error(errorMessage);
     }
 
     return response;

@@ -12,7 +12,6 @@ public class LikedTrackViewRow
     public string TrackName { get; set; } = string.Empty;
     public int DurationMs { get; set; }
     public bool Explicit { get; set; }
-    public int? Popularity { get; set; }
     public string? Isrc { get; set; }
     public int? AlbumId { get; set; }
     public string? AlbumSpotifyId { get; set; }
@@ -57,7 +56,6 @@ public class TrackDetailsViewRow
     public string TrackName { get; set; } = string.Empty;
     public int DurationMs { get; set; }
     public bool Explicit { get; set; }
-    public int? Popularity { get; set; }
     public int? AlbumId { get; set; }
     public string? AlbumSpotifyId { get; set; }
     public string? AlbumName { get; set; }

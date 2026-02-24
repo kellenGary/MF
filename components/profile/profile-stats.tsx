@@ -1,6 +1,5 @@
-import { ThemedText } from "@/components/themed-text";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { ThemedText } from "@/components/ui/themed-text";
+import { useTheme } from "@/contexts/ThemeContext";
 import { ProfileData } from "@/services/profileApi";
 import { Image } from "expo-image";
 import { RelativePathString, router, useFocusEffect } from "expo-router";
@@ -19,6 +18,7 @@ interface ProfileStatsProps {
     profileData: ProfileData | null;
     topArtists: any[];
     formatNumber: (num: number) => string;
+    userId?: number;
 }
 
 export default function ProfileStats({
@@ -26,16 +26,41 @@ export default function ProfileStats({
     profileData,
     topArtists,
     formatNumber,
+    userId,
 }: ProfileStatsProps) {
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === "dark";
-    const colors = Colors[isDark ? "dark" : "light"];
+    const { colors } = useTheme();
+
+    const effectiveUserId = userId ?? profileData?.id;
+
+    const handleFollowersPress = useCallback(() => {
+        if (effectiveUserId) {
+            router.push(`/profile/followers?userId=${effectiveUserId}` as RelativePathString);
+        }
+    }, [effectiveUserId]);
+
+    const handleFollowingPress = useCallback(() => {
+        if (effectiveUserId) {
+            router.push(`/profile/following-users?userId=${effectiveUserId}` as RelativePathString);
+        }
+    }, [effectiveUserId]);
+
+    const handleUniqueSongsPress = useCallback(() => {
+        if (effectiveUserId) {
+            router.push(`/profile/unique-songs?userId=${effectiveUserId}` as RelativePathString);
+        }
+    }, [effectiveUserId]);
 
     return (
         <>
             {/* Stats Row */}
             <View style={styles.statsContainer}>
-                <Pressable style={styles.statItem}>
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.statItem,
+                        { opacity: pressed ? 0.7 : 1 }
+                    ]}
+                    onPress={handleFollowersPress}
+                >
                     <ThemedText type="defaultSemiBold" style={styles.statNumber}>
                         {formatNumber(followCounts.followers)}
                     </ThemedText>
@@ -43,7 +68,13 @@ export default function ProfileStats({
                         Followers
                     </ThemedText>
                 </Pressable>
-                <Pressable style={styles.statItem}>
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.statItem,
+                        { opacity: pressed ? 0.7 : 1 }
+                    ]}
+                    onPress={handleFollowingPress}
+                >
                     <ThemedText type="defaultSemiBold" style={styles.statNumber}>
                         {formatNumber(followCounts.following)}
                     </ThemedText>
@@ -51,7 +82,13 @@ export default function ProfileStats({
                         Following
                     </ThemedText>
                 </Pressable>
-                <Pressable style={styles.statItem}>
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.statItem,
+                        { opacity: pressed ? 0.7 : 1 }
+                    ]}
+                    onPress={handleUniqueSongsPress}
+                >
                     <ThemedText type="defaultSemiBold" style={styles.statNumber}>
                         {formatNumber(profileData?.totalUniqueTracks || 0)}
                     </ThemedText>
@@ -125,8 +162,6 @@ const styles = StyleSheet.create({
         width: 60,
         height: 60,
         borderRadius: 30,
-        borderWidth: 2,
-        borderColor: "rgba(255,255,255,0.3)",
     },
     topArtistName: {
         marginTop: 6,

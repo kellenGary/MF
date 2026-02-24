@@ -9,8 +9,7 @@ CREATE TABLE IF NOT EXISTS Artists (
     SpotifyId TEXT NOT NULL,
     Name TEXT NOT NULL,
     GenresJson TEXT,
-    ImageUrl TEXT,
-    Popularity INTEGER
+    ImageUrl TEXT
 );
 CREATE UNIQUE INDEX IF NOT EXISTS IX_Artists_SpotifyId ON Artists(SpotifyId);
 
@@ -33,7 +32,7 @@ CREATE TABLE IF NOT EXISTS Tracks (
     Name TEXT NOT NULL,
     DurationMs INTEGER NOT NULL DEFAULT 0,
     Explicit INTEGER NOT NULL DEFAULT 0,
-    Popularity INTEGER,
+    Explicit INTEGER NOT NULL DEFAULT 0,
     Isrc TEXT,
     AlbumId INTEGER,
     FOREIGN KEY (AlbumId) REFERENCES Albums(Id) ON DELETE RESTRICT
