@@ -374,13 +374,13 @@ public class SpotifyAlbumController : ControllerBase
             client.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", accessToken);
 
-            var requestBody = new { uris = new[] { $"spotify:album:{albumId}" } };
+            var requestBody = new { ids = new[] { albumId } };
             var jsonContent = new StringContent(
                 JsonSerializer.Serialize(requestBody),
                 System.Text.Encoding.UTF8,
                 "application/json");
 
-            var response = await client.PutAsync("https://api.spotify.com/v1/me/library", jsonContent);
+            var response = await client.PutAsync("https://api.spotify.com/v1/me/albums", jsonContent);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -443,13 +443,13 @@ public class SpotifyAlbumController : ControllerBase
             client.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", accessToken);
 
-            var requestBody = new { uris = new[] { $"spotify:album:{albumId}" } };
+            var requestBody = new { ids = new[] { albumId } };
             var jsonContent = new StringContent(
                 JsonSerializer.Serialize(requestBody),
                 System.Text.Encoding.UTF8,
                 "application/json");
 
-            var request = new HttpRequestMessage(HttpMethod.Delete, "https://api.spotify.com/v1/me/library")
+            var request = new HttpRequestMessage(HttpMethod.Delete, "https://api.spotify.com/v1/me/albums")
             {
                 Content = jsonContent
             };

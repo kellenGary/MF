@@ -4,14 +4,17 @@ import { ThemedText } from '@/components/ui/themed-text';
 import ErrorScreen from "@/components/ui/error-screen";
 import LoadingScreen from "@/components/ui/loading-screen";
 import { Colors } from "@/constants/theme";
+import api from "@/services/api";
 import playbackApi from "@/services/playbackApi";
 import spotifyApi from "@/services/spotifyApi";
 import { MaterialIcons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Pressable,
   ScrollView,
@@ -22,6 +25,15 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const ALBUM_COVER_SIZE = 180;
+const FAN_AVATAR_SIZE = 36;
+
+interface AlbumFan {
+  id: number;
+  displayName: string | null;
+  handle: string | null;
+  profileImageUrl: string | null;
+  isFollowing: boolean;
+}
 
 export default function AlbumScreen() {
   const { id } = useLocalSearchParams();
@@ -32,6 +44,8 @@ export default function AlbumScreen() {
   const [saved, setSaved] = useState<boolean | null>(null);
   const [saveLoading, setSaveLoading] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [fans, setFans] = useState<AlbumFan[]>([]);
+  const [fansLoading, setFansLoading] = useState(false);
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const colors = Colors[isDark ? "dark" : "light"];
@@ -68,6 +82,28 @@ export default function AlbumScreen() {
       }
     }
     checkSaved();
+  }, [id]);
+
+  // Fetch fans (friends who saved this album)
+  useEffect(() => {
+    if (!id) return;
+    async function fetchFans() {
+      setFansLoading(true);
+      try {
+        const response = await api.makeAuthenticatedRequest(
+          `/api/albums/spotify/${id}/fans?limit=8`,
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setFans(data.fans || []);
+        }
+      } catch (error) {
+        console.error("Error fetching album fans:", error);
+      } finally {
+        setFansLoading(false);
+      }
+    }
+    fetchFans();
   }, [id]);
 
   // Calculate total duration
@@ -113,9 +149,9 @@ export default function AlbumScreen() {
     playbackApi.playAlbum(album.id);
   }, [album?.id]);
 
-  const handlePlayTrack = useCallback((trackId: string) => {
+  const handlePlayTrack = useCallback((spotifyId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    playbackApi.playSong(trackId);
+    playbackApi.playSong(spotifyId);
   }, []);
 
   const handleShareToFeed = useCallback(async () => {
@@ -149,6 +185,9 @@ export default function AlbumScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     playbackApi.shuffleAlbum(album.id);
   }, [album?.id]);
+
+  // Count friends (those the user follows)
+  const friendCount = fans.filter((f) => f.isFollowing).length;
 
   if (loading) {
     return <LoadingScreen message="Loading album..." />;
@@ -197,31 +236,29 @@ export default function AlbumScreen() {
 
           {/* Stats Row */}
           <View style={styles.statsRow}>
-            <View style={styles.stat}>
-              <ThemedText style={[styles.statValue, { color: colors.text }]}>
-                {tracks.length}
-              </ThemedText>
-              <ThemedText style={[styles.statLabel, { color: colors.icon }]}>
-                Tracks
+            <View style={styles.statItem}>
+              <Ionicons name="musical-notes" size={16} color={colors.icon} />
+              <ThemedText style={[styles.statText, { color: colors.icon }]}>
+                {tracks.length} tracks
               </ThemedText>
             </View>
-            <View style={styles.stat}>
-              <ThemedText style={[styles.statValue, { color: colors.text }]}>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Ionicons name="time-outline" size={16} color={colors.icon} />
+              <ThemedText style={[styles.statText, { color: colors.icon }]}>
                 {formatDuration(totalDuration)}
-              </ThemedText>
-              <ThemedText style={[styles.statLabel, { color: colors.icon }]}>
-                Duration
               </ThemedText>
             </View>
             {album.release_date && (
-              <View style={styles.stat}>
-                <ThemedText style={[styles.statValue, { color: colors.text }]}>
-                  {new Date(album.release_date).toLocaleDateString()}
-                </ThemedText>
-                <ThemedText style={[styles.statLabel, { color: colors.icon }]}>
-                  Released
-                </ThemedText>
-              </View>
+              <>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Ionicons name="calendar-outline" size={16} color={colors.icon} />
+                  <ThemedText style={[styles.statText, { color: colors.icon }]}>
+                    {new Date(album.release_date).getFullYear()}
+                  </ThemedText>
+                </View>
+              </>
             )}
           </View>
 
@@ -245,17 +282,6 @@ export default function AlbumScreen() {
               handleToggleLike={handleToggleSave}
             />
 
-            {/* Shuffle Button */}
-            <Pressable
-              style={[styles.actionButton, { backgroundColor: colors.card }]}
-              onPress={handleShuffle}
-            >
-              <MaterialIcons name="shuffle" size={18} color={colors.text} />
-              <ThemedText style={[styles.actionText, { color: colors.text }]}>
-                Shuffle
-              </ThemedText>
-            </Pressable>
-
             {/* Share Button */}
             <Pressable
               style={[styles.actionButton, { backgroundColor: colors.card }]}
@@ -270,6 +296,111 @@ export default function AlbumScreen() {
           </View>
         </View>
 
+        {/* Friends Who Saved Section */}
+        {(fans.length > 0 || fansLoading) && (
+          <View style={styles.section}>
+            <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
+              {friendCount > 0
+                ? `${friendCount} friend${friendCount > 1 ? "s" : ""} saved this`
+                : "People who saved this"}
+            </ThemedText>
+            {fansLoading ? (
+              <ActivityIndicator size="small" color={Colors.primary} />
+            ) : (
+              <View style={styles.fansContainer}>
+                <View style={styles.fansAvatarRow}>
+                  {fans.slice(0, 6).map((fan, index) => (
+                    <Pressable
+                      key={fan.id}
+                      style={[
+                        styles.fanAvatarWrapper,
+                        { marginLeft: index > 0 ? -10 : 0, zIndex: fans.length - index },
+                      ]}
+                      onPress={() => router.push(`/profile/${fan.id}` as any)}
+                    >
+                      {fan.profileImageUrl ? (
+                        <Image
+                          source={{ uri: fan.profileImageUrl }}
+                          style={[
+                            styles.fanAvatar,
+                            {
+                              borderColor: colors.background,
+                              borderWidth: 2,
+                            },
+                          ]}
+                        />
+                      ) : (
+                        <View
+                          style={[
+                            styles.fanAvatar,
+                            styles.fanAvatarPlaceholder,
+                            {
+                              borderColor: colors.background,
+                              borderWidth: 2,
+                              backgroundColor: isDark
+                                ? "rgba(255,255,255,0.1)"
+                                : "rgba(0,0,0,0.08)",
+                            },
+                          ]}
+                        >
+                          <MaterialIcons
+                            name="person"
+                            size={18}
+                            color={colors.icon}
+                          />
+                        </View>
+                      )}
+                      {fan.isFollowing && (
+                        <View style={[styles.followingDot, { borderColor: colors.background }]} />
+                      )}
+                    </Pressable>
+                  ))}
+                  {fans.length > 6 && (
+                    <View
+                      style={[
+                        styles.fanAvatarWrapper,
+                        { marginLeft: -10, zIndex: 0 },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.fanAvatar,
+                          styles.fanAvatarPlaceholder,
+                          {
+                            borderColor: colors.background,
+                            borderWidth: 2,
+                            backgroundColor: isDark
+                              ? "rgba(255,255,255,0.15)"
+                              : "rgba(0,0,0,0.1)",
+                          },
+                        ]}
+                      >
+                        <ThemedText
+                          style={[styles.moreCount, { color: colors.text }]}
+                        >
+                          +{fans.length - 6}
+                        </ThemedText>
+                      </View>
+                    </View>
+                  )}
+                </View>
+                {fans.length > 0 && (
+                  <ThemedText
+                    style={[styles.fansNames, { color: colors.icon }]}
+                    numberOfLines={1}
+                  >
+                    {fans
+                      .slice(0, 3)
+                      .map((f) => f.displayName || f.handle || "User")
+                      .join(", ")}
+                    {fans.length > 3 && ` and ${fans.length - 3} more`}
+                  </ThemedText>
+                )}
+              </View>
+            )}
+          </View>
+        )}
+
         {/* Track List Section */}
         <View style={styles.section}>
           <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
@@ -280,7 +411,9 @@ export default function AlbumScreen() {
               <Pressable
                 key={`${track?.trackId || track?.id || index}-${index}`}
                 style={styles.trackItem}
-                onPress={() => router.push(`/song/${track?.id}` as any)}
+                onPress={() =>
+                  router.push(`/song/${track?.trackId}` as any)
+                }
               >
                 <ThemedText style={[styles.trackIndex, { color: colors.icon }]}>
                   {index + 1}
@@ -305,7 +438,10 @@ export default function AlbumScreen() {
                 </ThemedText>
                 <Pressable
                   style={styles.trackPlayButton}
-                  onPress={() => handlePlayTrack(track?.id)}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handlePlayTrack(track?.id);
+                  }}
                   hitSlop={8}
                 >
                   <MaterialIcons
@@ -362,19 +498,24 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: "row",
-    gap: 40,
-    marginTop: 20,
-  },
-  stat: {
     alignItems: "center",
+    marginTop: 12,
+    gap: 12,
   },
-  statValue: {
-    fontSize: 20,
-    fontWeight: "700",
+  statItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
-  statLabel: {
-    fontSize: 12,
-    marginTop: 2,
+  statText: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  statDivider: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(128,128,128,0.4)",
   },
   playButton: {
     flexDirection: "row",
@@ -417,6 +558,45 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500",
   },
+  // Fans / friends section
+  fansContainer: {
+    gap: 8,
+  },
+  fansAvatarRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  fanAvatarWrapper: {
+    position: "relative",
+  },
+  fanAvatar: {
+    width: FAN_AVATAR_SIZE,
+    height: FAN_AVATAR_SIZE,
+    borderRadius: FAN_AVATAR_SIZE / 2,
+  },
+  fanAvatarPlaceholder: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  followingDot: {
+    position: "absolute",
+    bottom: -1,
+    right: -1,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#1DB954",
+    borderWidth: 2,
+  },
+  moreCount: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  fansNames: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  // Track list
   trackList: {
     borderRadius: 12,
     overflow: "hidden",

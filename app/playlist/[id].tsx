@@ -1,14 +1,18 @@
-import SongItem from "@/components/ui/song-item";
+import BlurBackButton from "@/components/ui/blur-back-button";
+import LikeButton from "@/components/ui/like-button";
 import { ThemedText } from '@/components/ui/themed-text';
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import playbackApi from "@/services/playbackApi";
 import spotifyApi from "@/services/spotifyApi";
+import { MaterialIcons } from "@expo/vector-icons";
 import Entypo from "@expo/vector-icons/Entypo";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import * as Haptics from "expo-haptics";
 import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
 import { RelativePathString, router, useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -34,6 +38,7 @@ export default function PlaylistScreen() {
   const [playlist, setPlaylist] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [tracks, setTracks] = useState<any[]>([]);
+  const [sharing, setSharing] = useState(false);
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const colors = Colors[isDark ? "dark" : "light"];
@@ -41,20 +46,45 @@ export default function PlaylistScreen() {
   const [selectedTrackIndex, setSelectedTrackIndex] = useState(0);
 
   // Navigate to share screen
-  const navigateToShare = () => {
-    if (!playlist) return;
-    router.push({
-      pathname: "/post-preview",
-      params: {
-        type: "playlist",
-        id: id as string,
-        spotifyId: playlist.id,
-        name: playlist.name,
-        imageUrl: playlist.images[0]?.url || "",
-        subtitle: `${tracks.length} tracks`,
-      },
-    });
-  };
+  const handleShareToFeed = useCallback(() => {
+    if (!playlist || sharing) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSharing(true);
+    try {
+      router.push({
+        pathname: "/post-preview",
+        params: {
+          type: "playlist",
+          id: id as string,
+          spotifyId: playlist.id,
+          name: playlist.name,
+          imageUrl: playlist.images[0]?.url || "",
+          subtitle: `${tracks.length} tracks`,
+        },
+      });
+    } catch (error) {
+      console.error("Error navigating to share:", error);
+    } finally {
+      setSharing(false);
+    }
+  }, [playlist, sharing, id, tracks.length]);
+
+  const handlePlayPlaylist = useCallback(() => {
+    if (!playlist?.id) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    playbackApi.playPlaylist(playlist.id);
+  }, [playlist?.id]);
+
+  const handleShuffle = useCallback(() => {
+    if (!playlist?.id) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    playbackApi.shufflePlaylist(playlist.id);
+  }, [playlist?.id]);
+
+  const handlePlayTrack = useCallback((spotifyId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    playbackApi.playSong(spotifyId);
+  }, []);
 
   // Animation refs for throwing effect
   const throwAnim = useRef(new Animated.Value(0)).current;
@@ -187,51 +217,35 @@ export default function PlaylistScreen() {
         <View
           style={[styles.container, { backgroundColor: colors.background }]}
         >
+          {/* Floating buttons outside ScrollView - matches album pattern */}
+          <BlurBackButton />
+          <Pressable
+            onPress={() => setIsNormalView(false)}
+            style={({ pressed }) => [
+              styles.floatingViewToggle,
+              { opacity: pressed ? 0.7 : 1 },
+            ]}
+          >
+            <BlurView
+              intensity={80}
+              tint={isDark ? "dark" : "light"}
+              style={styles.blurButton}
+            >
+              <Ionicons
+                name="albums-outline"
+                size={20}
+                color={colors.text}
+              />
+            </BlurView>
+          </Pressable>
+
           <ScrollView
             style={styles.scrollView}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 40, paddingTop: insets.top }}
           >
-            {/* Hero Section with Gradient */}
+            {/* Hero Section */}
             <View style={styles.heroSection}>
-              {/* Back Button */}
-              <Pressable
-                onPress={() => router.back()}
-                style={({ pressed }) => [
-                  styles.floatingBackButton,
-                  { opacity: pressed ? 0.7 : 1 },
-                ]}
-              >
-                <BlurView
-                  intensity={80}
-                  tint={isDark ? "dark" : "light"}
-                  style={styles.blurButton}
-                >
-                  <Entypo name="chevron-left" size={24} color={colors.text} />
-                </BlurView>
-              </Pressable>
-
-              {/* View Toggle Button */}
-              <Pressable
-                onPress={() => setIsNormalView(false)}
-                style={({ pressed }) => [
-                  styles.floatingViewToggle,
-                  { opacity: pressed ? 0.7 : 1 },
-                ]}
-              >
-                <BlurView
-                  intensity={80}
-                  tint={isDark ? "dark" : "light"}
-                  style={styles.blurButton}
-                >
-                  <Ionicons
-                    name="albums-outline"
-                    size={20}
-                    color={colors.text}
-                  />
-                </BlurView>
-              </Pressable>
-
               {/* Playlist Cover */}
               <View style={styles.coverContainer}>
                 <Image
@@ -311,62 +325,102 @@ export default function PlaylistScreen() {
                   </View>
                 </View>
 
+                {/* Play Button */}
+                <Pressable
+                  style={[styles.playButton, { backgroundColor: Colors.primary }]}
+                  onPress={handlePlayPlaylist}
+                >
+                  <MaterialIcons name="play-arrow" size={22} color="#fff" />
+                  <ThemedText style={styles.playButtonText}>Play</ThemedText>
+                </Pressable>
+              </View>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.section}>
+              <View style={styles.actionsRow}>
+                {/* Shuffle Button */}
+                <Pressable
+                  style={[styles.actionButton, { backgroundColor: colors.card }]}
+                  onPress={handleShuffle}
+                >
+                  <MaterialIcons name="shuffle" size={18} color={colors.text} />
+                  <ThemedText style={[styles.actionText, { color: colors.text }]}>
+                    Shuffle
+                  </ThemedText>
+                </Pressable>
+
                 {/* Share Button */}
                 <Pressable
-                  onPress={navigateToShare}
-                  style={({ pressed }) => [
-                    styles.shareButton,
-                    { opacity: pressed ? 0.8 : 1 },
-                  ]}
+                  style={[styles.actionButton, { backgroundColor: colors.card }]}
+                  onPress={handleShareToFeed}
+                  disabled={sharing}
                 >
-                  <Ionicons
-                    name="share-outline"
-                    size={18}
-                    color={colors.text}
-                  />
-                  <ThemedText
-                    style={[styles.shareButtonText, { color: colors.text }]}
-                  >
-                    Share to Feed
+                  <MaterialIcons name="share" size={18} color={colors.text} />
+                  <ThemedText style={[styles.actionText, { color: colors.text }]}>
+                    Share
                   </ThemedText>
                 </Pressable>
               </View>
             </View>
 
             {/* Track List Section */}
-            <View
-              style={[
-                styles.trackListSection,
-                { backgroundColor: colors.background },
-              ]}
-            >
-              <View style={styles.trackListHeader}>
-                <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
-                  Tracks
-                </ThemedText>
-              </View>
-
-              <View style={styles.trackList}>
+            <View style={styles.section}>
+              <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
+                Tracks
+              </ThemedText>
+              <View style={[styles.trackList, { backgroundColor: colors.card }]}>
                 {tracks.map((item, index) => (
-                  <SongItem
+                  <Pressable
                     key={`${item.track?.trackId || item.track?.id || index}-${index}`}
-                    id={String(item.track?.trackId || "")}
-                    spotifyId={item.track?.id || ""}
-                    title={item.track?.name || "Unknown Track"}
-                    artist={
-                      item.track?.artists
-                        ?.map((artist: any) => artist.name)
-                        .join(", ") || "Unknown Artist"
+                    style={styles.trackItem}
+                    onPress={() =>
+                      router.push(`/song/${item.track?.trackId}` as RelativePathString)
                     }
-                    cover={item.track?.album?.images[0]?.url || ""}
-                    link={`/song/${item.track?.trackId}` as RelativePathString}
-                  />
+                  >
+                    <Image
+                      source={{ uri: item.track?.album?.images?.[0]?.url || "" }}
+                      style={styles.trackCover}
+                      contentFit="cover"
+                    />
+                    <View style={styles.trackInfo}>
+                      <ThemedText
+                        style={[styles.trackName, { color: colors.text }]}
+                        numberOfLines={1}
+                      >
+                        {item.track?.name || "Unknown Track"}
+                      </ThemedText>
+                      <ThemedText
+                        style={[styles.trackArtist, { color: colors.icon }]}
+                        numberOfLines={1}
+                      >
+                        {item.track?.artists
+                          ?.map((artist: any) => artist.name)
+                          .join(", ") || "Unknown Artist"}
+                      </ThemedText>
+                    </View>
+                    <ThemedText style={[styles.trackDuration, { color: colors.icon }]}>
+                      {formatTrackDuration(item.track?.duration_ms)}
+                    </ThemedText>
+                    <Pressable
+                      style={styles.trackPlayButton}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handlePlayTrack(item.track?.id);
+                      }}
+                      hitSlop={8}
+                    >
+                      <MaterialIcons
+                        name="play-circle-filled"
+                        size={28}
+                        color={Colors.primary}
+                      />
+                    </Pressable>
+                  </Pressable>
                 ))}
               </View>
-
-              {/* Bottom Spacing */}
-              <View style={styles.bottomSpacer} />
             </View>
+
           </ScrollView>
         </View>
       ) : (
@@ -375,7 +429,7 @@ export default function PlaylistScreen() {
           style={[styles.container, { backgroundColor: colors.background }]}
         >
           {/* Compact Header Row */}
-          <View style={styles.carouselHeader}>
+          <View style={[styles.carouselHeader, { paddingTop: insets.top + 10 }]}>
             {/* Back Button */}
             <Pressable
               onPress={() => router.back()}
@@ -620,7 +674,7 @@ export default function PlaylistScreen() {
                 </ThemedText>
               </View>
               <Pressable
-                style={[styles.playButton, { backgroundColor: Colors.primary }]}
+                style={[styles.carouselPlayButton, { backgroundColor: Colors.primary }]}
                 onPress={() => {
                   router.push(
                     `/song/${selectedTrack?.trackId}` as RelativePathString,
@@ -637,6 +691,13 @@ export default function PlaylistScreen() {
   );
 }
 
+function formatTrackDuration(ms: number | undefined): string {
+  if (!ms) return "--:--";
+  const minutes = Math.floor(ms / 60000);
+  const seconds = Math.floor((ms % 60000) / 1000);
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -644,9 +705,7 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  scrollContent: {
-    paddingBottom: 40,
-  },
+
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -686,21 +745,13 @@ const styles = StyleSheet.create({
   },
   heroSection: {
     alignItems: "center",
-    paddingTop: 60,
+    paddingTop: 20,
     paddingBottom: 32,
-    position: "relative",
   },
-  heroGradient: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 400,
-  },
-  floatingBackButton: {
+  floatingViewToggle: {
     position: "absolute",
     top: 50,
-    left: 16,
+    right: 16,
     zIndex: 10,
   },
   blurButton: {
@@ -754,7 +805,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginTop: 8,
-    gap: 16,
+    gap: 12,
   },
   statItem: {
     flexDirection: "row",
@@ -769,131 +820,91 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "rgba(255,255,255,0.4)",
+    backgroundColor: "rgba(128,128,128,0.4)",
   },
-  shareButton: {
+  playButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 24,
+    gap: 4,
     marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 24,
   },
-  shareButtonText: {
+  playButtonText: {
     color: "#fff",
     fontWeight: "600",
-    fontSize: 15,
+    fontSize: 16,
   },
-  trackListSection: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    marginTop: -20,
-    paddingTop: 24,
-  },
-  trackListHeader: {
+  // Action buttons section
+  section: {
     paddingHorizontal: 20,
-    marginBottom: 8,
+    marginTop: 24,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "700",
     letterSpacing: -0.3,
+    marginBottom: 12,
   },
-  trackList: {
-    paddingHorizontal: 4,
+  actionsRow: {
+    flexDirection: "row",
+    gap: 10,
   },
-  bottomSpacer: {
-    height: 100,
-  },
-  modalOverlay: {
+  actionButton: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 12,
   },
-  modalContent: {
-    width: "100%",
-    maxWidth: 400,
-    borderRadius: 20,
-    padding: 24,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    marginBottom: 20,
-    textAlign: "center",
-  },
-  modalPlaylistPreview: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 20,
-    gap: 12,
-  },
-  modalPlaylistImage: {
-    width: 56,
-    height: 56,
-    borderRadius: 8,
-  },
-  modalPlaylistInfo: {
-    flex: 1,
-  },
-  modalPlaylistName: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  modalPlaylistStats: {
+  actionText: {
     fontSize: 13,
-    marginTop: 2,
+    fontWeight: "500",
   },
-  captionInput: {
+  // Track list (matching album style)
+  trackList: {
     borderRadius: 12,
-    padding: 16,
-    fontSize: 15,
-    minHeight: 80,
-    textAlignVertical: "top",
-    marginBottom: 20,
+    overflow: "hidden",
   },
-  modalButtons: {
+  trackItem: {
     flexDirection: "row",
-    gap: 12,
-  },
-  modalCancelButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
     alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 10,
   },
-  modalCancelText: {
-    fontWeight: "600",
-    fontSize: 15,
+  trackCover: {
+    width: 44,
+    height: 44,
+    borderRadius: 4,
   },
-  modalShareButton: {
+  trackInfo: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: "center",
+    gap: 2,
   },
-  modalShareText: {
-    color: "#fff",
-    fontWeight: "600",
+  trackName: {
     fontSize: 15,
+    fontWeight: "500",
   },
+  trackArtist: {
+    fontSize: 13,
+  },
+  trackDuration: {
+    fontSize: 13,
+    marginRight: 4,
+  },
+  trackPlayButton: {
+    padding: 4,
+  },
+
   // Carousel View Styles
-  floatingViewToggle: {
-    position: "absolute",
-    top: 50,
-    right: 16,
-    zIndex: 10,
-  },
   carouselHeader: {
     flexDirection: "row",
     alignItems: "center",
-    paddingTop: 60,
     paddingHorizontal: 16,
     paddingBottom: 20,
     gap: 12,
@@ -934,31 +945,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  carouselContent: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 140,
-    alignItems: "center",
-    position: "relative",
-  },
-  carouselTrackCard: {
-    width: SCREEN_WIDTH * 0.7,
-    aspectRatio: 1,
-    borderRadius: 16,
-    overflow: "hidden",
-    position: "relative",
-  },
-  carouselTrackCardActive: {
-    transform: [{ scale: 1.02 }],
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-  },
-  carouselTrackImage: {
-    width: "100%",
-    height: "100%",
-  },
   bottomTrackBar: {
     position: "absolute",
     bottom: 0,
@@ -968,16 +954,10 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 32,
   },
-  bottomTrackBarBlur: {},
   bottomTrackInfo: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-  },
-  bottomTrackImage: {
-    width: 56,
-    height: 56,
-    borderRadius: 8,
   },
   bottomTrackDetails: {
     flex: 1,
@@ -990,7 +970,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
   },
-  playButton: {
+  carouselPlayButton: {
     width: 52,
     height: 52,
     borderRadius: 26,
@@ -1003,23 +983,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     position: "relative",
-  },
-  navButton: {
-    position: "absolute",
-    top: "50%",
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 200,
-  },
-  navButtonLeft: {
-    left: 16,
-  },
-  navButtonRight: {
-    right: 16,
   },
   cardStack: {
     width: SCREEN_WIDTH * 0.75,
