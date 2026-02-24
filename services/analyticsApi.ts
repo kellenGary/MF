@@ -11,7 +11,7 @@ export interface TopTrack {
   id: number;
   spotifyId: string;
   name: string;
-  playCount: number;
+  totalStreams: number;
   totalMinutes: number;
   artists: string[];
   album: {
@@ -26,15 +26,20 @@ export interface TopArtist {
   spotifyId: string;
   name: string;
   imageUrl: string | null;
-  playCount: number;
+  totalStreams: number;
 }
 
 export interface TopAlbum {
   id: number;
   spotifyId: string;
   name: string;
-  imageUrl: string | null;
   playCount: number;
+  imageUrl: string | null;
+}
+
+export interface ActivityPoint {
+  date: string;
+  count: number;
 }
 
 class AnalyticsApiService {
@@ -106,6 +111,38 @@ class AnalyticsApiService {
       throw new Error(`Failed to get top albums: ${response.statusText}`);
     }
     return await response.json();
+  }
+
+  /**
+   * Get the listening history for a specific track.
+   * NOTE: This is currently a MOCK implementation for UI demonstration.
+   */
+  async getTrackHistory(
+    trackId: number,
+    days: number = 7,
+  ): Promise<ActivityPoint[]> {
+    // Simulate API delay
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const data: ActivityPoint[] = [];
+    const now = new Date();
+
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+
+      // Generate some random realistic-looking data
+      // More recent days slightly weighted higher
+      const base = Math.floor(Math.random() * 20) + 5;
+      const boost = i < 3 ? Math.floor(Math.random() * 10) : 0;
+
+      data.push({
+        date: date.toISOString().split("T")[0],
+        count: Math.max(0, base + boost),
+      });
+    }
+
+    return data;
   }
 }
 

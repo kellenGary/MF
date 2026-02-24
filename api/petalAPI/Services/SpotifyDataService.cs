@@ -117,11 +117,6 @@ public class SpotifyDataService : ISpotifyDataService
                     }
                 }
 
-                // Note: Spotify API no longer returns popularity — this will always be null
-                int? popularity = artistData.TryGetProperty("popularity", out var popularityProp) 
-                    ? popularityProp.GetInt32() 
-                    : null;
-                
                 // Update name from full object if available (might be better than simplified one)
                 var fullName = artistData.TryGetProperty("name", out var fnProp) ? fnProp.GetString() : artistName;
 
@@ -130,7 +125,6 @@ public class SpotifyDataService : ISpotifyDataService
                     // Update existing
                     existingArtist.ImageUrl = imageUrl;
                     existingArtist.GenresJson = genresJson;
-                    existingArtist.Popularity = popularity;
                     await _context.SaveChangesAsync();
                      _logger.LogDebug("[SpotifyData] Updated artist details: {Name}", existingArtist.Name);
                     return existingArtist;
@@ -143,14 +137,22 @@ public class SpotifyDataService : ISpotifyDataService
                         SpotifyId = spotifyId,
                         Name = fullName ?? artistName,
                         GenresJson = genresJson,
-                        ImageUrl = imageUrl,
-                        Popularity = popularity
+                        ImageUrl = imageUrl
                     };
 
-                    _context.Artists.Add(artist);
-                    await _context.SaveChangesAsync();
-                    _logger.LogDebug("[SpotifyData] Created artist with details: {Name}", artist.Name);
-                    return artist;
+                    try
+                    {
+                        _context.Artists.Add(artist);
+                        await _context.SaveChangesAsync();
+                        _logger.LogDebug("[SpotifyData] Created artist with details: {Name}", artist.Name);
+                        return artist;
+                    }
+                    catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("UNIQUE constraint failed") == true)
+                    {
+                        // Race condition: another request inserted it
+                        _context.Entry(artist).State = EntityState.Detached;
+                        return await _context.Artists.FirstOrDefaultAsync(a => a.SpotifyId == spotifyId);
+                    }
                 }
             }
             else 
@@ -176,7 +178,7 @@ public class SpotifyDataService : ISpotifyDataService
                 catch (DbUpdateException) 
                 {
                     // Race condition
-                    _context.ChangeTracker.Clear();
+                    _context.Entry(artist).State = EntityState.Detached;
                     return await _context.Artists.FirstOrDefaultAsync(a => a.SpotifyId == spotifyId);
                 }
             }

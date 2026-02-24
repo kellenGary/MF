@@ -174,6 +174,9 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<ListeningHistory>()
             .HasIndex(lh => lh.DedupeKey)
             .IsUnique();
+        // Index for efficient filtering by CountsAsPlay in analytics/feed queries
+        modelBuilder.Entity<ListeningHistory>()
+            .HasIndex(lh => new { lh.UserId, lh.CountsAsPlay, lh.PlayedAt });
         modelBuilder.Entity<ListeningHistory>()
             .HasOne(lh => lh.User)
             .WithMany()

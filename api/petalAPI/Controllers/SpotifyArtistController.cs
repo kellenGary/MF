@@ -274,9 +274,6 @@ public class SpotifyArtistController : ControllerBase
                     ? images[0].GetProperty("url").GetString()
                     : null;
                 // Note: Spotify API no longer returns popularity — this will always be null
-                var popularity = artistJson.TryGetProperty("popularity", out var pop) 
-                    ? pop.GetInt32() 
-                    : (int?)null;
                 var genres = artistJson.TryGetProperty("genres", out var genresArr)
                     ? JsonSerializer.Serialize(genresArr)
                     : null;
@@ -290,7 +287,6 @@ public class SpotifyArtistController : ControllerBase
                         SpotifyId = spotifyId,
                         Name = name,
                         ImageUrl = imageUrl,
-                        Popularity = popularity,
                         GenresJson = genres
                     };
                     _dbContext.Artists.Add(artist);
@@ -300,7 +296,6 @@ public class SpotifyArtistController : ControllerBase
                 {
                     artist.Name = name;
                     artist.ImageUrl = imageUrl;
-                    artist.Popularity = popularity;
                     artist.GenresJson = genres;
                 }
 

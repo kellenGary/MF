@@ -91,9 +91,8 @@ export default function Feed({ ListHeaderComponent = null }: FeedProps) {
 
 const styles = StyleSheet.create({
   content: {
-    paddingBottom: 64,
     paddingHorizontal: 16,
-    gap: 12,
+    gap: 16,
   },
   footer: {
     paddingVertical: 20,

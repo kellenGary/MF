@@ -295,9 +295,7 @@ export default function PostScreen() {
               spotifyId: artist.id,
               name: artist.name,
               imageUrl: artist.imageUrl || null,
-              subtitle: artist.popularity
-                ? `Popularity: ${artist.popularity}`
-                : "Artist",
+              subtitle: "Artist",
             };
             return (
               <SelectableItem

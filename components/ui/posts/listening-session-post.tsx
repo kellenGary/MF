@@ -80,7 +80,6 @@ export default function ListeningSessionPost({
 
 const styles = StyleSheet.create({
   card: {
-    marginBottom: 16,
   },
   sessionInfo: {
     paddingHorizontal: 4,
