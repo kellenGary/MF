@@ -26,6 +26,20 @@ export interface AuthResponse {
   user: User;
 }
 
+export interface Comment {
+  id: number;
+  text: string;
+  entityType: number; // 0=Track, 1=Album, 2=Artist
+  entityId: string;
+  createdAt: string;
+  parentCommentId: number | null;
+  authorId: number;
+  authorDisplayName: string | null;
+  authorHandle: string | null;
+  authorProfileImageUrl: string | null;
+  isOwner: boolean;
+}
+
 class ApiService {
   private token: string | null = null;
   private onUnauthorized?: () => void;
@@ -121,6 +135,81 @@ class ApiService {
 
     return response;
   }
-}
 
+  // Petal Shuffle methods
+  async getPetalShuffleState(): Promise<{ isActive: boolean }> {
+    const response = await this.makeAuthenticatedRequest(
+      "/api/petal-shuffle/state",
+    );
+    if (!response.ok) throw new Error("Failed to fetch Petal Shuffle state");
+    return response.json();
+  }
+
+  async activatePetalShuffle(): Promise<{ success: boolean; active: boolean }> {
+    const response = await this.makeAuthenticatedRequest(
+      "/api/petal-shuffle/activate",
+      {
+        method: "POST",
+      },
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || "Failed to activate Petal Shuffle");
+    }
+    return response.json();
+  }
+
+  async deactivatePetalShuffle(): Promise<{
+    success: boolean;
+    active: boolean;
+  }> {
+    const response = await this.makeAuthenticatedRequest(
+      "/api/petal-shuffle/deactivate",
+      {
+        method: "POST",
+      },
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || "Failed to deactivate Petal Shuffle");
+    }
+    return response.json();
+  }
+
+  // Comments methods
+  async getComments(
+    entityType: number,
+    entityId: string,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<Comment[]> {
+    const response = await this.makeAuthenticatedRequest(
+      `/api/comments?entityType=${entityType}&entityId=${entityId}&page=${page}&limit=${limit}`,
+    );
+    if (!response.ok) throw new Error("Failed to fetch comments");
+    return response.json();
+  }
+
+  async postComment(
+    entityType: number,
+    entityId: string,
+    text: string,
+    parentCommentId?: number,
+  ): Promise<Comment> {
+    const response = await this.makeAuthenticatedRequest("/api/comments", {
+      method: "POST",
+      body: JSON.stringify({ entityType, entityId, text, parentCommentId }),
+    });
+    if (!response.ok) throw new Error("Failed to post comment");
+    return response.json();
+  }
+
+  async deleteComment(id: number): Promise<void> {
+    const response = await this.makeAuthenticatedRequest(
+      `/api/comments/${id}`,
+      { method: "DELETE" },
+    );
+    if (!response.ok) throw new Error("Failed to delete comment");
+  }
+}
 export default new ApiService();
