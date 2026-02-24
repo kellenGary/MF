@@ -3,7 +3,7 @@ import { useScrollContext } from "@/contexts/ScrollContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import useTrackStreaks from "@/hooks/useTrackStreaks";
 import useUserContent from "@/hooks/useUserContent";
-import profileApi, { ProfileData } from "@/services/profileApi";
+import profileApi, { CompatibilityResult, ProfileData } from "@/services/profileApi";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -15,6 +15,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import CompatibilityScore from "./compatibility-score";
 import ProfileContent from "./profile-content";
 import ProfileHeader from "./profile-header";
 import ProfileStats from "./profile-stats";
@@ -61,6 +62,9 @@ export default function UserProfile({ userId }: UserProfileProps) {
     followers: 0,
     following: 0,
   });
+
+  const [compatibility, setCompatibility] = useState<CompatibilityResult | null>(null);
+  const [compatibilityLoading, setCompatibilityLoading] = useState(false);
 
   const scrollViewRef = useRef<ScrollView>(null);
   const isOwnProfile = !userId;
@@ -242,6 +246,16 @@ export default function UserProfile({ userId }: UserProfileProps) {
       };
 
       fetchProfileData();
+
+      // Fetch compatibility score for other users' profiles
+      if (userId) {
+        setCompatibilityLoading(true);
+        profileApi.getCompatibility(userId)
+          .then(setCompatibility)
+          .catch(() => setCompatibility(null))
+          .finally(() => setCompatibilityLoading(false));
+      }
+
       fetchRecentTracks(PAGE_SIZE, 0, true).catch(() => { });
       fetchLikedTracks(PAGE_SIZE, 0, true).catch(() => { });
       fetchLikedAlbums(PAGE_SIZE, 0, true).catch(() => { });
@@ -323,6 +337,14 @@ export default function UserProfile({ userId }: UserProfileProps) {
             userId={effectiveUserId}
           />
         </View>
+
+        {/* Compatibility Score — only on other users' profiles */}
+        {!isOwnProfile && (
+          <CompatibilityScore
+            compatibility={compatibility}
+            loading={compatibilityLoading}
+          />
+        )}
 
         <ProfileContent
           loading={false}
