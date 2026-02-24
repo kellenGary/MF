@@ -2,10 +2,11 @@ import { ThemedText } from '@/components/ui/themed-text';
 import { usePlayback } from "@/contexts/playbackContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import spotifyApi from "@/services/spotifyApi";
+import api from "@/services/api";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -18,6 +19,8 @@ const { width, height } = Dimensions.get("window");
 
 export default function AudioPlayer() {
   const [isLiked, setIsLiked] = useState(false);
+  const [isPetalShuffleActive, setIsPetalShuffleActive] = useState(false);
+  const [isShuffling, setIsShuffling] = useState(false);
   const {
     playbackState,
     currentProgressMs,
@@ -53,6 +56,36 @@ export default function AudioPlayer() {
       setIsLiked(true);
     }
   };
+
+  const handlePetalShufflePress = async () => {
+    try {
+      setIsShuffling(true);
+      if (isPetalShuffleActive) {
+        const res = await api.deactivatePetalShuffle();
+        setIsPetalShuffleActive(res.active);
+      } else {
+        const res = await api.activatePetalShuffle();
+        setIsPetalShuffleActive(res.active);
+      }
+    } catch (error) {
+      console.error("Error toggling Petal Shuffle:", error);
+      alert(error instanceof Error ? error.message : "Failed to toggle Petal Shuffle");
+    } finally {
+      setIsShuffling(false);
+    }
+  };
+
+  useEffect(() => {
+    const fetchPetalShuffleState = async () => {
+      try {
+        const state = await api.getPetalShuffleState();
+        setIsPetalShuffleActive(state.isActive);
+      } catch (e) {
+        console.error("Failed to fetch petal shuffle state", e);
+      }
+    };
+    fetchPetalShuffleState();
+  }, []);
 
   useEffect(() => {
     const checkIfLiked = async () => {
@@ -170,17 +203,34 @@ export default function AudioPlayer() {
 
         {/* Playback Controls */}
         <View style={styles.controlsContainer}>
-          <Pressable onPress={toggleShuffle} style={styles.controlButton}>
-            <Ionicons
-              name="shuffle"
-              size={24}
-              color={
-                playbackState.shuffle_state
-                  ? "#538ce9ff"
-                  : "rgba(255,255,255,0.7)"
-              }
-            />
-          </Pressable>
+          <View style={styles.shuffleControlsWrapper}>
+            <Pressable onPress={handlePetalShufflePress} style={styles.controlButton}>
+              {isShuffling ? (
+                <ActivityIndicator size="small" color="#538ce9ff" />
+              ) : (
+                <Ionicons
+                  name="flower"
+                  size={24}
+                  color={
+                    isPetalShuffleActive
+                      ? "#ec4899" // Pink color for petal shuffle
+                      : "rgba(255,255,255,0.7)"
+                  }
+                />
+              )}
+            </Pressable>
+            <Pressable onPress={toggleShuffle} style={styles.controlButton}>
+              <Ionicons
+                name="shuffle"
+                size={24}
+                color={
+                  playbackState.shuffle_state
+                    ? "#538ce9ff"
+                    : "rgba(255,255,255,0.7)"
+                }
+              />
+            </Pressable>
+          </View>
 
           <Pressable onPress={skipPrevious} style={styles.controlButton}>
             <Ionicons name="play-back" size={32} color="#fff" />
@@ -323,6 +373,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 8,
+  },
+  shuffleControlsWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   controlButton: {
     padding: 8,

@@ -25,6 +25,9 @@ public class User
     // Whether the user completed initial profile customization
     public bool HasCompletedProfile { get; set; }
     
+    // Privacy setting for whether friends can join this user's active listening session
+    public bool IsSessionJoinable { get; set; } = true;
+    
     [Required]
     public string SpotifyAccessToken { get; set; } = string.Empty;
     
@@ -40,4 +43,8 @@ public class User
     // Caching Top Artists (JSON blob)
     public string? TopArtistsJson { get; set; }
     public DateTime? TopArtistsUpdatedAt { get; set; }
+
+    // Petal Shuffle tracking
+    public bool IsPetalShuffleActive { get; set; }
+    public string? OriginalContextUri { get; set; }
 }
