@@ -20,6 +20,7 @@ interface User {
   email: string | null;
   profileImageUrl: string | null;
   hasCompletedProfile: boolean;
+  isSessionJoinable: boolean;
 }
 
 interface AuthContextType {

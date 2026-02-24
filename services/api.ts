@@ -18,6 +18,7 @@ export interface User {
   email: string | null;
   profileImageUrl: string | null;
   hasCompletedProfile: boolean;
+  isSessionJoinable: boolean;
 }
 
 export interface AuthResponse {
