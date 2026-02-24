@@ -171,7 +171,7 @@ export default function AlbumScreen() {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 32, paddingTop: insets.top }}
         showsVerticalScrollIndicator={false}
       >
         {/* Album Header */}
@@ -192,7 +192,7 @@ export default function AlbumScreen() {
             style={[styles.artistName, { color: colors.icon }]}
             numberOfLines={1}
           >
-            {album.artists?.map((a: any) => a.name).join(", ") || "Unknown Artist"}
+            {album.artists?.[0].name || "Unknown Artist"}
           </ThemedText>
 
           {/* Stats Row */}
@@ -216,7 +216,7 @@ export default function AlbumScreen() {
             {album.release_date && (
               <View style={styles.stat}>
                 <ThemedText style={[styles.statValue, { color: colors.text }]}>
-                  {new Date(album.release_date).getFullYear()}
+                  {new Date(album.release_date).toLocaleDateString()}
                 </ThemedText>
                 <ThemedText style={[styles.statLabel, { color: colors.icon }]}>
                   Released

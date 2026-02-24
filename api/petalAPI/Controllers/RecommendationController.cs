@@ -160,7 +160,7 @@ public class RecommendationController : ControllerBase
         
         // Get tracks the user has already listened to (to exclude from recommendations)
         var listenedTrackIds = await _context.ListeningHistory
-            .Where(lh => lh.UserId == userId)
+            .Where(lh => lh.UserId == userId && lh.CountsAsPlay)
             .Select(lh => lh.TrackId)
             .Distinct()
             .ToListAsync();
@@ -179,7 +179,7 @@ public class RecommendationController : ControllerBase
         // ========================================================================
         
         var artistPlayCounts = await _context.ListeningHistory
-            .Where(lh => lh.UserId == userId && lh.PlayedAt > cutoffDate)
+            .Where(lh => lh.UserId == userId && lh.CountsAsPlay && lh.PlayedAt > cutoffDate)
             .Join(_context.TrackArtists, lh => lh.TrackId, ta => ta.TrackId, (lh, ta) => ta.ArtistId)
             .GroupBy(artistId => artistId)
             .Select(g => new { ArtistId = g.Key, PlayCount = g.Count() })
@@ -224,7 +224,7 @@ public class RecommendationController : ControllerBase
             .ToListAsync();
 
         var friendTrackActivity = await _context.ListeningHistory
-            .Where(lh => followedUserIds.Contains(lh.UserId) && lh.PlayedAt > friendCutoffDate)
+            .Where(lh => followedUserIds.Contains(lh.UserId) && lh.CountsAsPlay && lh.PlayedAt > friendCutoffDate)
             .GroupBy(lh => lh.TrackId)
             .Select(g => new
             {
@@ -278,7 +278,7 @@ public class RecommendationController : ControllerBase
             // (Spotify popularity field is no longer available)
             var needed = 20 - candidateTrackIds.Count;
             var mostPlayedTracks = await _context.ListeningHistory
-                .Where(lh => !excludedTrackIds.Contains(lh.TrackId) && !candidateTrackIds.Contains(lh.TrackId))
+                .Where(lh => lh.CountsAsPlay && !excludedTrackIds.Contains(lh.TrackId) && !candidateTrackIds.Contains(lh.TrackId))
                 .GroupBy(lh => lh.TrackId)
                 .OrderByDescending(g => g.Count())
                 .Take(needed + 10)

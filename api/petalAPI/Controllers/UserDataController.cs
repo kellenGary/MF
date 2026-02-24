@@ -742,8 +742,9 @@ public class UserDataController : ControllerBase
             if (offset < 0) offset = 0;
 
             // Get all listening history with tracks, then group in memory
+            // Only include entries that count as meaningful plays (>= 15s)
             var allHistory = await _context.ListeningHistory
-                .Where(lh => lh.UserId == userId)
+                .Where(lh => lh.UserId == userId && lh.CountsAsPlay)
                 .Include(lh => lh.Track)
                     .ThenInclude(t => t.Album)
                 .Include(lh => lh.Track)

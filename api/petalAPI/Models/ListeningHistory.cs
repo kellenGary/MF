@@ -26,4 +26,11 @@ public class ListeningHistory
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
     public double? LocationAccuracy { get; set; }
+
+    /// <summary>
+    /// Whether this entry counts as a meaningful play.
+    /// Set to false when MsPlayed is less than 15 seconds (15000ms).
+    /// Used to filter out skips/previews from recently played, sessions, streaks, and analytics.
+    /// </summary>
+    public bool CountsAsPlay { get; set; } = true;
 }

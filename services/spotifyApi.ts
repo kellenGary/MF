@@ -116,6 +116,14 @@ class SpotifyApiService {
     return await response.json();
   }
 
+  // Fetch playlist tracks directly from Spotify
+  async getPlaylistTracks(playlistId: string): Promise<any> {
+    const response = await api.makeAuthenticatedRequest(
+      `/api/spotify/playlists/${playlistId}/tracks`,
+    );
+    return await response.json();
+  }
+
   async getLikedSongs(userId?: string): Promise<any> {
     const response = await api.makeAuthenticatedRequest(
       "/api/spotify/tracks/liked",

@@ -303,20 +303,21 @@ public class SavedTracksSyncService : ISavedTracksSyncService
 
                     if (existingTrackArtist == null)
                     {
+                        var trackArtist = new TrackArtist
+                        {
+                            TrackId = track.Id,
+                            ArtistId = artist.Id,
+                            ArtistOrder = order
+                        };
                         try
                         {
-                            _context.TrackArtists.Add(new TrackArtist
-                            {
-                                TrackId = track.Id,
-                                ArtistId = artist.Id,
-                                ArtistOrder = order
-                            });
+                            _context.TrackArtists.Add(trackArtist);
                             await _context.SaveChangesAsync();
                         }
                         catch (DbUpdateException)
                         {
                             // TrackArtist relationship already exists, ignore
-                            _context.ChangeTracker.Clear();
+                            _context.Entry(trackArtist).State = EntityState.Detached;
                         }
                     }
                     order++;
@@ -354,21 +355,22 @@ public class SavedTracksSyncService : ISavedTracksSyncService
 
                 if (existingTrackArtist == null)
                 {
+                    var trackArtist = new TrackArtist
+                    {
+                        TrackId = trackId,
+                        ArtistId = artist.Id,
+                        ArtistOrder = order
+                    };
                     try
                     {
-                        _context.TrackArtists.Add(new TrackArtist
-                        {
-                            TrackId = trackId,
-                            ArtistId = artist.Id,
-                            ArtistOrder = order
-                        });
+                        _context.TrackArtists.Add(trackArtist);
                         await _context.SaveChangesAsync();
                         _logger.LogDebug("[SavedTracksSync] Added artist {ArtistName} to existing track {TrackId}", 
                             artist.Name, trackId);
                     }
                     catch (DbUpdateException)
                     {
-                        _context.ChangeTracker.Clear();
+                        _context.Entry(trackArtist).State = EntityState.Detached;
                     }
                 }
                 order++;

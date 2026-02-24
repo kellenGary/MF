@@ -30,7 +30,7 @@ public class TrendingController : ControllerBase
         var cutoffDate = DateTime.UtcNow.AddDays(-days);
 
         var trendingTracks = await _context.ListeningHistory
-            .Where(lh => lh.PlayedAt >= cutoffDate)
+            .Where(lh => lh.PlayedAt >= cutoffDate && lh.CountsAsPlay)
             .GroupBy(lh => lh.TrackId)
             .Select(g => new
             {
@@ -79,7 +79,7 @@ public class TrendingController : ControllerBase
         var cutoffDate = DateTime.UtcNow.AddDays(-days);
 
         var trendingArtists = await _context.ListeningHistory
-            .Where(lh => lh.PlayedAt >= cutoffDate)
+            .Where(lh => lh.PlayedAt >= cutoffDate && lh.CountsAsPlay)
             .Join(_context.Tracks, lh => lh.TrackId, t => t.Id, (lh, t) => new { lh, t })
             .Join(_context.TrackArtists, x => x.t.Id, ta => ta.TrackId, (x, ta) => new { x.lh, ta.ArtistId })
             .GroupBy(x => x.ArtistId)
@@ -121,7 +121,7 @@ public class TrendingController : ControllerBase
         var cutoffDate = DateTime.UtcNow.AddDays(-days);
 
         var trendingAlbums = await _context.ListeningHistory
-            .Where(lh => lh.PlayedAt >= cutoffDate)
+            .Where(lh => lh.PlayedAt >= cutoffDate && lh.CountsAsPlay)
             .Join(_context.Tracks, lh => lh.TrackId, t => t.Id, (lh, t) => new { lh, t.AlbumId })
             .Where(x => x.AlbumId != null)
             .GroupBy(x => x.AlbumId)

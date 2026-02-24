@@ -44,7 +44,7 @@ public class AnalyticsController : ControllerBase
             : DateTime.MinValue;
 
         var historyQuery = _context.ListeningHistory
-            .Where(lh => lh.UserId == userId.Value);
+            .Where(lh => lh.UserId == userId.Value && lh.CountsAsPlay);
         
         if (days > 0)
             historyQuery = historyQuery.Where(lh => lh.PlayedAt >= cutoffDate);
@@ -79,7 +79,7 @@ public class AnalyticsController : ControllerBase
             : DateTime.MinValue;
 
         var historyQuery = _context.ListeningHistory
-            .Where(lh => lh.UserId == userId.Value);
+            .Where(lh => lh.UserId == userId.Value && lh.CountsAsPlay);
         
         if (days > 0)
             historyQuery = historyQuery.Where(lh => lh.PlayedAt >= cutoffDate);
@@ -138,7 +138,7 @@ public class AnalyticsController : ControllerBase
             : DateTime.MinValue;
 
         var historyQuery = _context.ListeningHistory
-            .Where(lh => lh.UserId == userId.Value);
+            .Where(lh => lh.UserId == userId.Value && lh.CountsAsPlay);
         
         if (days > 0)
             historyQuery = historyQuery.Where(lh => lh.PlayedAt >= cutoffDate);
@@ -189,7 +189,7 @@ public class AnalyticsController : ControllerBase
             : DateTime.MinValue;
 
         var historyQuery = _context.ListeningHistory
-            .Where(lh => lh.UserId == userId.Value);
+            .Where(lh => lh.UserId == userId.Value && lh.CountsAsPlay);
         
         if (days > 0)
             historyQuery = historyQuery.Where(lh => lh.PlayedAt >= cutoffDate);

@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import api from "@/services/api";
 import playbackApi from "@/services/playbackApi";
 import spotifyApi from "@/services/spotifyApi";
+import analyticsApi, { ActivityPoint } from "@/services/analyticsApi";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
@@ -13,13 +14,25 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  LayoutAnimation,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
+  UIManager,
   View
 } from "react-native";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { FilterPill } from "@/components/analytics/FilterPill";
+import MiniLineChart from "@/components/ui/MiniLineChart";
+
+// Enable LayoutAnimation for Android
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+type TimeFrame = "7" | "30" | "90" | "0";
 
 interface Fan {
   id: number;
@@ -40,6 +53,18 @@ export default function SongModal() {
   const [fans, setFans] = useState<Fan[]>([]);
   const [fansLoading, setFansLoading] = useState(false);
   const [sharing, setSharing] = useState(false);
+
+  // Popularity chart state
+  const [timeFrame, setTimeFrame] = useState<TimeFrame>("7");
+  const [trackHistory, setTrackHistory] = useState<ActivityPoint[] | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const timeFrameOptions = [
+    { label: "7D", value: "7" as TimeFrame },
+    { label: "30D", value: "30" as TimeFrame },
+    { label: "90D", value: "90" as TimeFrame },
+    { label: "All", value: "0" as TimeFrame },
+  ];
 
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -109,6 +134,30 @@ export default function SongModal() {
     }
     fetchFans();
   }, [id]);
+
+  // Fetch track listening history for popularity chart
+  useEffect(() => {
+    if (!id) return;
+    async function fetchHistory() {
+      setHistoryLoading(true);
+      try {
+        const days = parseInt(timeFrame) || 7;
+        const history = await analyticsApi.getTrackHistory(Number(id), days);
+        setTrackHistory(history);
+      } catch (error) {
+        console.error("Error fetching track history:", error);
+        setTrackHistory(null);
+      } finally {
+        setHistoryLoading(false);
+      }
+    }
+    fetchHistory();
+  }, [id, timeFrame]);
+
+  const handleTimeFrameChange = (value: TimeFrame) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setTimeFrame(value);
+  };
 
   const handleToggleLike = useCallback(async () => {
     if (!song?.spotify_id || liked === null || likeLoading) return;
@@ -395,6 +444,48 @@ export default function SongModal() {
 
           </View>
         </View>
+
+        {/* Popularity / Listening History Section */}
+        <View style={styles.section}>
+          <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
+            Popularity
+          </ThemedText>
+
+          {/* Time Frame Filter Pills */}
+          <View style={styles.filterRow}>
+            {timeFrameOptions.map((opt) => (
+              <FilterPill
+                key={opt.value}
+                label={opt.label}
+                isActive={timeFrame === opt.value}
+                onPress={() => handleTimeFrameChange(opt.value)}
+              />
+            ))}
+          </View>
+
+          {/* Chart */}
+          <View style={[styles.chartCard, { backgroundColor: colors.card }]}>
+            {historyLoading ? (
+              <ActivityIndicator
+                color={Colors.primary}
+                style={{ margin: 20 }}
+              />
+            ) : trackHistory && trackHistory.length > 0 ? (
+              <MiniLineChart
+                data={trackHistory}
+                height={160}
+                color={Colors.primary}
+              />
+            ) : (
+              <View style={styles.noDataContainer}>
+                <MaterialIcons name="bar-chart" size={32} color={colors.icon} />
+                <ThemedText style={{ color: colors.icon, marginTop: 8 }}>
+                  No listening data yet
+                </ThemedText>
+              </View>
+            )}
+          </View>
+        </View>
       </View>
     </ScrollView>
   );
@@ -573,5 +664,19 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "right",
   },
-
+  filterRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 8,
+  },
+  chartCard: {
+    borderRadius: 12,
+    padding: 14,
+    alignItems: "center",
+  },
+  noDataContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 30,
+  },
 });

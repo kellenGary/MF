@@ -140,10 +140,19 @@ public class SpotifyDataService : ISpotifyDataService
                         ImageUrl = imageUrl
                     };
 
-                    _context.Artists.Add(artist);
-                    await _context.SaveChangesAsync();
-                    _logger.LogDebug("[SpotifyData] Created artist with details: {Name}", artist.Name);
-                    return artist;
+                    try
+                    {
+                        _context.Artists.Add(artist);
+                        await _context.SaveChangesAsync();
+                        _logger.LogDebug("[SpotifyData] Created artist with details: {Name}", artist.Name);
+                        return artist;
+                    }
+                    catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("UNIQUE constraint failed") == true)
+                    {
+                        // Race condition: another request inserted it
+                        _context.Entry(artist).State = EntityState.Detached;
+                        return await _context.Artists.FirstOrDefaultAsync(a => a.SpotifyId == spotifyId);
+                    }
                 }
             }
             else 
@@ -169,7 +178,7 @@ public class SpotifyDataService : ISpotifyDataService
                 catch (DbUpdateException) 
                 {
                     // Race condition
-                    _context.ChangeTracker.Clear();
+                    _context.Entry(artist).State = EntityState.Detached;
                     return await _context.Artists.FirstOrDefaultAsync(a => a.SpotifyId == spotifyId);
                 }
             }

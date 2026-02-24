@@ -27,6 +27,12 @@ public class ListeningHistoryService : IListeningHistoryService
     private readonly IListeningSessionService _listeningSessionService;
     private readonly ISpotifyDataService _spotifyDataService;
 
+    /// <summary>
+    /// Minimum milliseconds played for an entry to count as a meaningful play.
+    /// Entries below this threshold are still stored but marked CountsAsPlay = false.
+    /// </summary>
+    private const int MinPlayTimeMs = 15000; // 15 seconds
+
     public ListeningHistoryService(
         AppDbContext context,
         IHttpClientFactory httpClientFactory,
@@ -134,6 +140,8 @@ public class ListeningHistoryService : IListeningHistoryService
     {
         try
         {
+            var countsAsPlay = msPlayed >= MinPlayTimeMs;
+
             var listeningHistory = new ListeningHistory
             {
                 UserId = userId,
@@ -144,14 +152,23 @@ public class ListeningHistoryService : IListeningHistoryService
                 DeviceType = deviceType,
                 Source = ListeningSource.App,
                 Latitude = latitude,
-                Longitude = longitude
+                Longitude = longitude,
+                CountsAsPlay = countsAsPlay
             };
 
             _context.ListeningHistory.Add(listeningHistory);
             await _context.SaveChangesAsync();
             
-            _logger.LogInformation("[ListeningHistory] Added listening entry for user {UserId}, track {TrackId}", 
-                userId, trackId);
+            if (!countsAsPlay)
+            {
+                _logger.LogInformation("[ListeningHistory] Added listening entry for user {UserId}, track {TrackId} (skipped - only {Ms}ms played)", 
+                    userId, trackId, msPlayed);
+            }
+            else
+            {
+                _logger.LogInformation("[ListeningHistory] Added listening entry for user {UserId}, track {TrackId}", 
+                    userId, trackId);
+            }
         }
         catch (Exception ex)
         {
@@ -270,6 +287,7 @@ public class ListeningHistoryService : IListeningHistoryService
             }
 
             // Create listening history entry
+            var countsAsPlay = progressMs >= MinPlayTimeMs;
             var listeningHistory = new ListeningHistory
             {
                 UserId = userId,
@@ -279,26 +297,35 @@ public class ListeningHistoryService : IListeningHistoryService
                 Source = ListeningSource.App,
                 DedupeKey = dedupeKey,
                 Latitude = latitude,
-                Longitude = longitude
+                Longitude = longitude,
+                CountsAsPlay = countsAsPlay
             };
 
             _context.ListeningHistory.Add(listeningHistory);
             await _context.SaveChangesAsync();
 
-            // Trigger session detection for automatic listening sessions
-            try
+            // Only trigger session detection for meaningful plays
+            if (countsAsPlay)
             {
-                await _listeningSessionService.ProcessNewTrackAsync(
-                    userId,
-                    listeningHistory.Id,
-                    dbTrack.Id,
-                    playedAt,
-                    dbTrack.DurationMs);
+                try
+                {
+                    await _listeningSessionService.ProcessNewTrackAsync(
+                        userId,
+                        listeningHistory.Id,
+                        dbTrack.Id,
+                        playedAt,
+                        dbTrack.DurationMs);
+                }
+                catch (Exception sessionEx)
+                {
+                    // Log but don't fail the main operation if session processing fails
+                    _logger.LogWarning(sessionEx, "[ListeningHistory] Session processing failed for user {UserId}", userId);
+                }
             }
-            catch (Exception sessionEx)
+            else
             {
-                // Log but don't fail the main operation if session processing fails
-                _logger.LogWarning(sessionEx, "[ListeningHistory] Session processing failed for user {UserId}", userId);
+                _logger.LogInformation("[ListeningHistory] Skipping session processing for short play ({Ms}ms) for user {UserId}",
+                    progressMs, userId);
             }
 
             _logger.LogInformation("[ListeningHistory] Added currently playing for user {UserId}, track {TrackName} at ({Lat}, {Lng})",
@@ -654,6 +681,7 @@ public class ListeningHistoryService : IListeningHistoryService
                 : null;
 
             // Create listening history entry
+            var countsAsPlaySync = msPlayed >= MinPlayTimeMs;
             var listeningHistory = new ListeningHistory
             {
                 UserId = userId,
@@ -664,7 +692,8 @@ public class ListeningHistoryService : IListeningHistoryService
                 Source = ListeningSource.SpotifyApi,
                 DedupeKey = dedupeKey,
                 Latitude = latitude,
-                Longitude = longitude
+                Longitude = longitude,
+                CountsAsPlay = countsAsPlaySync
             };
 
             _context.ListeningHistory.Add(listeningHistory);
@@ -672,20 +701,23 @@ public class ListeningHistoryService : IListeningHistoryService
             // Save all changes together (track-artists + listening history)
             await _context.SaveChangesAsync();
 
-            // Trigger session detection for synced tracks
-            try
+            // Only trigger session detection for meaningful plays
+            if (countsAsPlaySync)
             {
-                await _listeningSessionService.ProcessNewTrackAsync(
-                    userId,
-                    listeningHistory.Id,
-                    dbTrack.Id,
-                    playedAt,
-                    dbTrack.DurationMs);
-            }
-            catch (Exception sessionEx)
-            {
-                // Log but don't fail the main operation if session processing fails
-                _logger.LogWarning(sessionEx, "[ListeningHistory] Session processing failed for user {UserId} during sync", userId);
+                try
+                {
+                    await _listeningSessionService.ProcessNewTrackAsync(
+                        userId,
+                        listeningHistory.Id,
+                        dbTrack.Id,
+                        playedAt,
+                        dbTrack.DurationMs);
+                }
+                catch (Exception sessionEx)
+                {
+                    // Log but don't fail the main operation if session processing fails
+                    _logger.LogWarning(sessionEx, "[ListeningHistory] Session processing failed for user {UserId} during sync", userId);
+                }
             }
 
             _logger.LogInformation("[ListeningHistory] Added listening entry for user {UserId}, track {TrackName} ({SpotifyId})", 

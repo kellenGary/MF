@@ -72,6 +72,13 @@ public class SpotifySyncBackgroundService : BackgroundService
                     _logger.LogWarning("[SpotifySyncBackground] Could not get valid access token for user {UserId}", user.Id);
                 }
             }
+            catch (SpotifyAuthRevokedException)
+            {
+                // Tokens already cleared by SpotifyTokenService — user won't appear in next sync cycle.
+                _logger.LogWarning(
+                    "[SpotifySyncBackground] Spotify auth revoked for user {UserId} ({DisplayName}). Skipping until re-authentication.",
+                    user.Id, user.DisplayName);
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "[SpotifySyncBackground] Error syncing history for user {UserId}", user.Id);

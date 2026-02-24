@@ -55,7 +55,9 @@ export default function ProfileContent({
                             Recent Tracks
                         </ThemedText>
                     </View>
-                    <TrackCarousel tracks={recentTracks} />
+                    <View style={{ paddingHorizontal: 16 }}>
+                        <TrackCarousel tracks={recentTracks} />
+                    </View>
                 </View>
             )}
 
@@ -67,7 +69,9 @@ export default function ProfileContent({
                             Liked Songs
                         </ThemedText>
                     </View>
-                    <TrackCarousel tracks={likedTracks} />
+                    <View style={{ paddingHorizontal: 16 }}>
+                        <TrackCarousel tracks={likedTracks} />
+                    </View>
                 </View>
             )}
 
@@ -114,6 +118,50 @@ export default function ProfileContent({
                                 </Pressable>
                             );
                         })}
+                    </ScrollView>
+                </View>
+            )}
+
+            {/* Playlists Section */}
+            {filteredPlaylists && filteredPlaylists.length > 0 && (
+                <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                        <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
+                            Playlists
+                        </ThemedText>
+                        <ThemedText style={[styles.sectionCount, { color: colors.text }]}>
+                            {filteredPlaylists.length} playlists
+                        </ThemedText>
+                    </View>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.horizontalScrollContent}
+                    >
+                        {filteredPlaylists.map((playlist: any, index: number) => (
+                            <Pressable
+                                key={`playlist-${playlist.id}-${index}`}
+                                style={styles.mediaCard}
+                                onPress={() => router.push(`/playlist/${playlist.id}`)}
+                            >
+                                <Image
+                                    source={{ uri: playlist.images?.[0]?.url }}
+                                    style={[styles.mediaImage, { backgroundColor: colors.card }]}
+                                />
+                                <ThemedText
+                                    style={[styles.mediaTitle, { color: colors.text }]}
+                                    numberOfLines={1}
+                                >
+                                    {playlist.name}
+                                </ThemedText>
+                                <ThemedText
+                                    style={[styles.mediaSubtitle, { color: colors.text }]}
+                                    numberOfLines={1}
+                                >
+                                    {playlist.tracks?.total || 0} songs
+                                </ThemedText>
+                            </Pressable>
+                        ))}
                     </ScrollView>
                 </View>
             )}
@@ -177,50 +225,6 @@ export default function ProfileContent({
                 </View>
             )}
 
-            {/* Playlists Section */}
-            {filteredPlaylists && filteredPlaylists.length > 0 && (
-                <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
-                            Playlists
-                        </ThemedText>
-                        <ThemedText style={[styles.sectionCount, { color: colors.text }]}>
-                            {filteredPlaylists.length} playlists
-                        </ThemedText>
-                    </View>
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.horizontalScrollContent}
-                    >
-                        {filteredPlaylists.map((playlist: any, index: number) => (
-                            <Pressable
-                                key={`playlist-${playlist.id}-${index}`}
-                                style={styles.mediaCard}
-                                onPress={() => router.push(`/playlist/${playlist.id}`)}
-                            >
-                                <Image
-                                    source={{ uri: playlist.images?.[0]?.url }}
-                                    style={[styles.mediaImage, { backgroundColor: colors.card }]}
-                                />
-                                <ThemedText
-                                    style={[styles.mediaTitle, { color: colors.text }]}
-                                    numberOfLines={1}
-                                >
-                                    {playlist.name}
-                                </ThemedText>
-                                <ThemedText
-                                    style={[styles.mediaSubtitle, { color: colors.text }]}
-                                    numberOfLines={1}
-                                >
-                                    {playlist.tracks?.total || 0} songs
-                                </ThemedText>
-                            </Pressable>
-                        ))}
-                    </ScrollView>
-                </View>
-            )}
-
             {/* Bottom spacer for scroll padding */}
             <View style={styles.bottomSpacer} />
 
@@ -247,12 +251,12 @@ const styles = StyleSheet.create({
     },
     section: {
         marginBottom: 24,
-        paddingHorizontal: 16,
     },
     sectionHeader: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "baseline",
+        paddingHorizontal: 16,
         marginBottom: 12,
     },
     sectionTitle: {
@@ -264,6 +268,7 @@ const styles = StyleSheet.create({
         opacity: 0.5,
     },
     horizontalScrollContent: {
+        paddingHorizontal: 16,
         gap: 12,
     },
     mediaCard: {

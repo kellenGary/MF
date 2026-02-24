@@ -103,10 +103,8 @@ export default function HomeScreen() {
     </>
   );
 
-  // renderEmpty: shown when the feed has no items — encourages discovery by following users.
-
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top, paddingBottom: insets.bottom + 32 }]}>
       <Feed ListHeaderComponent={renderHeader()} />
 
       <SotdSuggestionPopup

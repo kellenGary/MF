@@ -217,8 +217,10 @@ public class ListeningHistoryController : ControllerBase
             if (offset < 0) offset = 0;
 
             // Use the enriched view for better performance
+            // Only include entries that count as meaningful plays (>= 15s)
             var query = _context.ListeningHistoryEnriched
-                .Where(h => h.UserId == userId);
+                .Where(h => h.UserId == userId)
+                .Where(h => h.MsPlayed >= 15000);
 
             // Apply date filter if days is specified
             if (days.HasValue && days.Value > 0)
@@ -334,7 +336,7 @@ public class ListeningHistoryController : ControllerBase
             // 1. Get unique Track IDs and their last played time for the user
             // We filter by user first
             var userHistoryQuery = _context.ListeningHistory
-                .Where(h => h.UserId == userId);
+                .Where(h => h.UserId == userId && h.CountsAsPlay);
 
             // If there's a search query, we perform a pre-filter on tracks
             // Note: complex search + group by is hard for EF.
@@ -476,8 +478,10 @@ public class ListeningHistoryController : ControllerBase
             if (offset < 0) offset = 0;
 
             // Use the enriched view for better performance
+            // Only include entries that count as meaningful plays (>= 15s)
             var query = _context.ListeningHistoryEnriched
-                .Where(h => h.UserId == userId);
+                .Where(h => h.UserId == userId)
+                .Where(h => h.MsPlayed >= 15000);
 
             // Apply date filter if days is specified
             if (days.HasValue && days.Value > 0)
@@ -578,7 +582,7 @@ public class ListeningHistoryController : ControllerBase
             if (offset < 0) offset = 0;
 
             var query = _context.ListeningHistory
-                .Where(h => h.UserId == userId && h.Latitude.HasValue && h.Longitude.HasValue)
+                .Where(h => h.UserId == userId && h.CountsAsPlay && h.Latitude.HasValue && h.Longitude.HasValue)
                 .Include(h => h.Track)
                     .ThenInclude(t => t.Album)
                 .Include(h => h.Track)
@@ -659,7 +663,7 @@ public class ListeningHistoryController : ControllerBase
             if (offset < 0) offset = 0;
 
             var query = _context.ListeningHistory
-                .Where(h => h.Latitude.HasValue && h.Longitude.HasValue)
+                .Where(h => h.CountsAsPlay && h.Latitude.HasValue && h.Longitude.HasValue)
                 .Include(h => h.User)
                 .Include(h => h.Track)
                     .ThenInclude(t => t.Album)
@@ -751,8 +755,9 @@ public class ListeningHistoryController : ControllerBase
             var today = DateTime.UtcNow.Date;
 
             // Get all listening history for the user with track info
+            // Only include entries that count as meaningful plays
             var listeningHistory = await _context.ListeningHistory
-                .Where(h => h.UserId == userId)
+                .Where(h => h.UserId == userId && h.CountsAsPlay)
                 .Include(h => h.Track)
                 .Select(h => new { h.Track.SpotifyId, PlayedDate = h.PlayedAt.Date })
                 .ToListAsync();

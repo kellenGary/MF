@@ -86,7 +86,6 @@ export default function SharedTrackPost({ item, onDelete }: SharedTrackPostProps
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 24,
   },
   caption: {
     fontSize: 15,
