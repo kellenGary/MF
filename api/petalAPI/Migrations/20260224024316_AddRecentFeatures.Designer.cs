@@ -11,8 +11,8 @@ using PetalAPI.Data;
 namespace PetalAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260224020403_AddPetalShuffleFields")]
-    partial class AddPetalShuffleFields
+    [Migration("20260224024316_AddRecentFeatures")]
+    partial class AddRecentFeatures
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -91,9 +91,6 @@ namespace PetalAPI.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<int?>("Popularity")
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("SpotifyId")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -139,8 +136,6 @@ namespace PetalAPI.Migrations
 
                     b.HasIndex("ParentCommentId");
 
-                    b.HasIndex("EntityType", "EntityId", "CreatedAt");
-
                     b.ToTable("Comments");
                 });
 
@@ -170,6 +165,9 @@ namespace PetalAPI.Migrations
 
                     b.Property<string>("ContextUri")
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("CountsAsPlay")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("DedupeKey")
                         .HasColumnType("TEXT");
@@ -209,6 +207,8 @@ namespace PetalAPI.Migrations
                     b.HasIndex("TrackId");
 
                     b.HasIndex("UserId", "PlayedAt");
+
+                    b.HasIndex("UserId", "CountsAsPlay", "PlayedAt");
 
                     b.ToTable("ListeningHistory");
                 });
@@ -250,9 +250,6 @@ namespace PetalAPI.Migrations
 
                     b.Property<DateTime>("PlayedAt")
                         .HasColumnType("TEXT");
-
-                    b.Property<int?>("Popularity")
-                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Source")
                         .HasColumnType("INTEGER");
@@ -347,6 +344,41 @@ namespace PetalAPI.Migrations
                     b.ToTable("ListeningSessionTracks");
                 });
 
+            modelBuilder.Entity("PetalAPI.Models.Notification", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ActorUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("PostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorUserId");
+
+                    b.HasIndex("PostId");
+
+                    b.HasIndex("UserId", "IsRead", "CreatedAt");
+
+                    b.ToTable("Notifications");
+                });
+
             modelBuilder.Entity("PetalAPI.Models.Playlist", b =>
                 {
                     b.Property<int>("Id")
@@ -439,11 +471,17 @@ namespace PetalAPI.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<int?>("ListeningSessionId")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("MetadataJson")
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("OriginalPostId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("PlaylistId")
                         .HasColumnType("INTEGER");
@@ -472,6 +510,8 @@ namespace PetalAPI.Migrations
                     b.HasIndex("ListeningSessionId")
                         .IsUnique();
 
+                    b.HasIndex("OriginalPostId");
+
                     b.HasIndex("PlaylistId");
 
                     b.HasIndex("SourceListeningHistoryId");
@@ -481,6 +521,81 @@ namespace PetalAPI.Migrations
                     b.HasIndex("UserId", "CreatedAt");
 
                     b.ToTable("Posts");
+                });
+
+            modelBuilder.Entity("PetalAPI.Models.PostLike", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("UserId", "PostId");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("PostId");
+
+                    b.ToTable("PostLikes");
+                });
+
+            modelBuilder.Entity("PetalAPI.Models.RecommendationDismissal", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("DismissedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("TrackId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TrackId");
+
+                    b.HasIndex("UserId", "TrackId")
+                        .IsUnique();
+
+                    b.ToTable("RecommendationDismissals");
+                });
+
+            modelBuilder.Entity("PetalAPI.Models.Repost", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("OriginalPostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("RepostPostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OriginalPostId");
+
+                    b.HasIndex("RepostPostId");
+
+                    b.HasIndex("UserId", "OriginalPostId")
+                        .IsUnique();
+
+                    b.ToTable("Reposts");
                 });
 
             modelBuilder.Entity("PetalAPI.Models.SongOfTheDay", b =>
@@ -564,9 +679,6 @@ namespace PetalAPI.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("TEXT");
-
-                    b.Property<int?>("Popularity")
-                        .HasColumnType("INTEGER");
 
                     b.Property<string>("SpotifyId")
                         .IsRequired()
@@ -760,9 +872,6 @@ namespace PetalAPI.Migrations
                     b.Property<string>("Handle")
                         .HasColumnType("TEXT");
 
-                    b.Property<bool>("IsSessionJoinable")
-                        .HasColumnType("INTEGER");
-
                     b.Property<DateTime?>("LastPlayedAt")
                         .HasColumnType("TEXT");
 
@@ -826,8 +935,7 @@ namespace PetalAPI.Migrations
 
                     b.HasOne("PetalAPI.Models.Comment", "ParentComment")
                         .WithMany("Replies")
-                        .HasForeignKey("ParentCommentId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .HasForeignKey("ParentCommentId");
 
                     b.Navigation("Author");
 
@@ -910,6 +1018,32 @@ namespace PetalAPI.Migrations
                     b.Navigation("Track");
                 });
 
+            modelBuilder.Entity("PetalAPI.Models.Notification", b =>
+                {
+                    b.HasOne("PetalAPI.Models.User", "ActorUser")
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PetalAPI.Models.Post", "Post")
+                        .WithMany()
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("PetalAPI.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ActorUser");
+
+                    b.Navigation("Post");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("PetalAPI.Models.Playlist", b =>
                 {
                     b.HasOne("PetalAPI.Models.User", "OwnerUser")
@@ -956,6 +1090,11 @@ namespace PetalAPI.Migrations
                         .HasForeignKey("PetalAPI.Models.Post", "ListeningSessionId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("PetalAPI.Models.Post", "OriginalPost")
+                        .WithMany()
+                        .HasForeignKey("OriginalPostId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("PetalAPI.Models.Playlist", "Playlist")
                         .WithMany()
                         .HasForeignKey("PlaylistId")
@@ -983,11 +1122,78 @@ namespace PetalAPI.Migrations
 
                     b.Navigation("ListeningSession");
 
+                    b.Navigation("OriginalPost");
+
                     b.Navigation("Playlist");
 
                     b.Navigation("SourceListeningHistory");
 
                     b.Navigation("Track");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("PetalAPI.Models.PostLike", b =>
+                {
+                    b.HasOne("PetalAPI.Models.Post", "Post")
+                        .WithMany("Likes")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PetalAPI.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Post");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("PetalAPI.Models.RecommendationDismissal", b =>
+                {
+                    b.HasOne("PetalAPI.Models.Track", "Track")
+                        .WithMany()
+                        .HasForeignKey("TrackId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PetalAPI.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Track");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("PetalAPI.Models.Repost", b =>
+                {
+                    b.HasOne("PetalAPI.Models.Post", "OriginalPost")
+                        .WithMany()
+                        .HasForeignKey("OriginalPostId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PetalAPI.Models.Post", "RepostPost")
+                        .WithMany()
+                        .HasForeignKey("RepostPostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PetalAPI.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("OriginalPost");
+
+                    b.Navigation("RepostPost");
 
                     b.Navigation("User");
                 });
@@ -1152,6 +1358,11 @@ namespace PetalAPI.Migrations
             modelBuilder.Entity("PetalAPI.Models.Playlist", b =>
                 {
                     b.Navigation("Tracks");
+                });
+
+            modelBuilder.Entity("PetalAPI.Models.Post", b =>
+                {
+                    b.Navigation("Likes");
                 });
 
             modelBuilder.Entity("PetalAPI.Models.Track", b =>

@@ -37,8 +37,8 @@ public class SearchController : ControllerBase
 
         // Search users by display name or handle
         var users = await _context.Users
-            .Where(u => u.DisplayName.ToLower().Contains(query) || 
-                        u.Handle.ToLower().Contains(query))
+            .Where(u => (u.DisplayName != null && u.DisplayName.ToLower().Contains(query)) || 
+                        (u.Handle != null && u.Handle.ToLower().Contains(query)))
             .Take(limit)
             .Select(u => new
             {

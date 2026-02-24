@@ -205,6 +205,7 @@ public class FollowController : ControllerBase
     /// Retrieves a list of users who follow the specified user.
     /// </summary>
     /// <param name="userId">The ID of the user whose followers to retrieve.</param>
+    /// <param name="query">Optional search query to filter followers by display name or handle.</param>
     /// <param name="limit">The maximum number of items to return.</param>
     /// <param name="offset">The number of items to skip.</param>
     [HttpGet("followers/{userId}")]
@@ -236,7 +237,7 @@ public class FollowController : ControllerBase
         {
             var normalizedQ = query.Trim().ToLower();
             dbQuery = dbQuery.Where(f => 
-                f.Follower.DisplayName.ToLower().Contains(normalizedQ) || 
+                (f.Follower.DisplayName != null && f.Follower.DisplayName.ToLower().Contains(normalizedQ)) || 
                 (f.Follower.Handle != null && f.Follower.Handle.ToLower().Contains(normalizedQ)));
         }
 
@@ -270,6 +271,7 @@ public class FollowController : ControllerBase
     /// Retrieves a list of users that the specified user is following.
     /// </summary>
     /// <param name="userId">The ID of the user whose following list to retrieve.</param>
+    /// <param name="query">Optional search query to filter following by display name or handle.</param>
     /// <param name="limit">The maximum number of items to return.</param>
     /// <param name="offset">The number of items to skip.</param>
     [HttpGet("following/{userId}")]
@@ -301,7 +303,7 @@ public class FollowController : ControllerBase
         {
             var normalizedQ = query.Trim().ToLower();
             dbQuery = dbQuery.Where(f => 
-                f.Followee.DisplayName.ToLower().Contains(normalizedQ) || 
+                (f.Followee.DisplayName != null && f.Followee.DisplayName.ToLower().Contains(normalizedQ)) || 
                 (f.Followee.Handle != null && f.Followee.Handle.ToLower().Contains(normalizedQ)));
         }
 

@@ -34,6 +34,7 @@ public class AppDbContext : DbContext
     public DbSet<Repost> Reposts { get; set; }
     public DbSet<Notification> Notifications { get; set; }
     public DbSet<RecommendationDismissal> RecommendationDismissals { get; set; }
+    public DbSet<Comment> Comments { get; set; }
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

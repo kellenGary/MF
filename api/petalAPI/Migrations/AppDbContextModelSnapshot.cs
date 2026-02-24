@@ -100,6 +100,42 @@ namespace PetalAPI.Migrations
                     b.ToTable("Artists");
                 });
 
+            modelBuilder.Entity("PetalAPI.Models.Comment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("AuthorId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("EntityType")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("ParentCommentId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuthorId");
+
+                    b.HasIndex("ParentCommentId");
+
+                    b.ToTable("Comments");
+                });
+
             modelBuilder.Entity("PetalAPI.Models.Follow", b =>
                 {
                     b.Property<int>("FollowerUserId")
@@ -697,6 +733,15 @@ namespace PetalAPI.Migrations
                     b.Property<bool>("HasCompletedProfile")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("IsPetalShuffleActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsSessionJoinable")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("OriginalContextUri")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ProfileImageUrl")
                         .HasColumnType("TEXT");
 
@@ -875,6 +920,23 @@ namespace PetalAPI.Migrations
                     b.Navigation("Album");
 
                     b.Navigation("Track");
+                });
+
+            modelBuilder.Entity("PetalAPI.Models.Comment", b =>
+                {
+                    b.HasOne("PetalAPI.Models.User", "Author")
+                        .WithMany()
+                        .HasForeignKey("AuthorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PetalAPI.Models.Comment", "ParentComment")
+                        .WithMany("Replies")
+                        .HasForeignKey("ParentCommentId");
+
+                    b.Navigation("Author");
+
+                    b.Navigation("ParentComment");
                 });
 
             modelBuilder.Entity("PetalAPI.Models.Follow", b =>
@@ -1276,6 +1338,11 @@ namespace PetalAPI.Migrations
             modelBuilder.Entity("PetalAPI.Models.Artist", b =>
                 {
                     b.Navigation("TrackArtists");
+                });
+
+            modelBuilder.Entity("PetalAPI.Models.Comment", b =>
+                {
+                    b.Navigation("Replies");
                 });
 
             modelBuilder.Entity("PetalAPI.Models.ListeningSession", b =>
