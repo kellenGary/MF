@@ -17,6 +17,20 @@ export interface ProfileData {
   lastPlayedAt: Date;
 }
 
+export interface CompatibilityBreakdownFactor {
+  name: string;
+  score: number;
+  count: number;
+  label: string;
+  hasData: boolean;
+}
+
+export interface CompatibilityResult {
+  score: number;
+  insufficientData: boolean;
+  breakdown: CompatibilityBreakdownFactor[];
+}
+
 class ProfileApiService {
   // Profile endpoints
   async getProfile(): Promise<User> {
@@ -70,6 +84,13 @@ class ProfileApiService {
       ? `/api/SongOfTheDay/${userId}`
       : "/api/SongOfTheDay";
     const response = await api.makeAuthenticatedRequest(endpoint);
+    return await response.json();
+  }
+
+  async getCompatibility(userId: number): Promise<CompatibilityResult> {
+    const response = await api.makeAuthenticatedRequest(
+      `/api/users/${userId}/compatibility`,
+    );
     return await response.json();
   }
 }

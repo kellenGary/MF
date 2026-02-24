@@ -1,4 +1,5 @@
 // Profile components barrel export
+export { default as CompatibilityScore } from "./compatibility-score";
 export { default as FollowButton } from "./follow-button";
 export { default as ProfileContent } from "./profile-content";
 export { default as ProfileHeader } from "./profile-header";
