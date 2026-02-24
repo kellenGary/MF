@@ -1,12 +1,12 @@
-import { ThemedText } from "@/components/themed-text";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import { ProfileData } from "@/services/profileApi";
+import { ThemedText } from "@/components/ui/themed-text";
+import { useTheme } from "@/contexts/ThemeContext";
+import profileApi, { ProfileData } from "@/services/profileApi";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { Pressable, StyleSheet, View } from "react-native";
-import FollowButton from "./follow-button";
+import { useEffect, useState } from "react";
+import { Linking, Pressable, StyleSheet, View } from "react-native";
+import FollowButton from "../ui/follow-button";
 import SOTDProfile from "./sotd-profile";
 
 interface ProfileHeaderProps {
@@ -24,9 +24,24 @@ export default function ProfileHeader({
     userId,
     onFollowChange,
 }: ProfileHeaderProps) {
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === "dark";
-    const colors = Colors[isDark ? "dark" : "light"];
+    const { colors } = useTheme();
+
+    const [currentPlayback, setCurrentPlayback] = useState<{ isPlaying: boolean; track?: { id: string; name: string; uri: string; } } | null>(null);
+
+    useEffect(() => {
+        if (profileData && profileData.isSessionJoinable) {
+            const uid = userId || profileData.id;
+            if (uid) {
+                profileApi.getCurrentPlayback(uid).then(res => {
+                    setCurrentPlayback(res);
+                }).catch(err => {
+                    console.error("Failed to fetch current playback in header:", err);
+                });
+            }
+        } else {
+            setCurrentPlayback(null);
+        }
+    }, [profileData, userId]);
 
     return (
         <>
@@ -77,8 +92,21 @@ export default function ProfileHeader({
                     {profileData ? "@" + profileData.handle : "unknown"}
                 </ThemedText>
 
+                {/* Now Listening Indicator */}
+                {currentPlayback?.isPlaying && currentPlayback.track && (
+                    <Pressable
+                        style={[styles.nowListeningPill, { backgroundColor: "rgba(29, 185, 84, 0.15)" }]}
+                        onPress={() => Linking.openURL(currentPlayback.track!.uri)}
+                    >
+                        <MaterialIcons name="headphones" size={16} color="#1DB954" style={styles.nowListeningIcon} />
+                        <ThemedText style={styles.nowListeningText} numberOfLines={1}>
+                            Listening to <ThemedText style={styles.nowListeningTrack}>{currentPlayback.track.name}</ThemedText>
+                        </ThemedText>
+                    </Pressable>
+                )}
+
                 {/* Follow Button for other users' profiles */}
-                {!isOwnProfile && (
+                {!isOwnProfile && userId && (
                     <FollowButton userId={userId} onFollowChange={onFollowChange} />
                 )}
             </View>
@@ -139,5 +167,27 @@ const styles = StyleSheet.create({
     },
     profileName: {
         marginBottom: 4,
+    },
+    nowListeningPill: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginTop: 12,
+        marginBottom: 4,
+        paddingVertical: 6,
+        paddingHorizontal: 16,
+        borderRadius: 20,
+        maxWidth: '80%',
+    },
+    nowListeningIcon: {
+        marginRight: 6,
+    },
+    nowListeningText: {
+        fontSize: 13,
+        color: "#1DB954",
+        fontWeight: "500",
+    },
+    nowListeningTrack: {
+        fontWeight: "bold",
+        color: "#1DB954",
     },
 });

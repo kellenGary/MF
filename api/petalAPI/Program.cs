@@ -66,10 +66,23 @@ builder.Services.AddHttpClient("Spotify", client =>
 // Register default as well for other usages not using named client, but best to migrate
 builder.Services.AddHttpClient();
 
-// Add SQLite Database
+// Add Database
+var dbProvider = builder.Configuration["DatabaseProvider"];
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection"))
-    .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
+{
+    if (string.Equals(dbProvider, "Sqlite", StringComparison.OrdinalIgnoreCase))
+    {
+        options.UseSqlite(connectionString);
+    }
+    else
+    {
+        options.UseNpgsql(connectionString);
+    }
+    
+    options.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+});
 
 // Add JWT Service
 builder.Services.AddScoped<IJwtService, JwtService>();
@@ -82,6 +95,9 @@ builder.Services.AddScoped<IPlaylistSyncService, PlaylistSyncService>();
 builder.Services.AddScoped<ISavedTracksSyncService, SavedTracksSyncService>();
 builder.Services.AddScoped<IPostService, PostService>();
 builder.Services.AddScoped<ISpotifyDataService, SpotifyDataService>();
+
+// Register background services
+builder.Services.AddHostedService<SpotifySyncBackgroundService>();
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
@@ -113,7 +129,8 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated();
+    // Apply migrations
+    db.Database.Migrate();
 
     // Apply SQL views from script
     try
@@ -134,27 +151,6 @@ using (var scope = app.Services.CreateScope())
     catch (Exception ex)
     {
         Console.WriteLine($"Failed to apply SQL views: {ex.Message}");
-    }
-
-    // Apply migration for caching columns (manual safe execution)
-    try 
-    {
-        var contentRoot = app.Environment.ContentRootPath;
-        var scriptPath = Path.Combine(contentRoot, "scripts", "add_caching_columns.sql");
-        if (File.Exists(scriptPath))
-        {
-            var existingCols = db.Database.SqlQueryRaw<string>("SELECT name FROM pragma_table_info('Users')").ToList();
-            if (!existingCols.Contains("TopArtistsJson"))
-            {
-                var sql = File.ReadAllText(scriptPath);
-                db.Database.ExecuteSqlRaw(sql);
-                Console.WriteLine("Applied caching columns migration.");
-            }
-        }
-    }
-    catch (Exception ex)
-    {
-         Console.WriteLine($"Failed to apply caching columns: {ex.Message}");
     }
 }
 

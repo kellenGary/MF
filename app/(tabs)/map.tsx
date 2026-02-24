@@ -1,28 +1,23 @@
-import { ThemedText } from '@/components/themed-text';
 import {
   ClusteredMapMarker,
   ClusteredMarker,
   clusterMarkers,
-} from "@/components/map";
-import { Colors, Fonts } from "@/constants/theme";
+} from "@/components/ui/map";
+import SearchBar from "@/components/ui/search-bar";
+import { ThemedText } from '@/components/ui/themed-text';
+import { Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import listeningHistoryApi, {
   GlobalLocationHistoryEntry,
 } from "@/services/listeningHistoryApi";
-import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { Image } from "expo-image";
 import * as Location from "expo-location";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  FlatList,
-  Modal,
-  Pressable,
   StyleSheet,
-  Text,
-  View,
+  View
 } from "react-native";
 import MapView, { Region } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -103,17 +98,71 @@ export default function MapScreen() {
     fetchLocationHistory();
   }, [isAuthenticated]);
 
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Filter history items based on search query
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return historyItems;
+
+    const query = searchQuery.toLowerCase().trim();
+    return historyItems.filter((item) => {
+      const trackName = item.track.name.toLowerCase();
+      const artistNames = item.track.artists
+        .map((a) => a.name.toLowerCase())
+        .join(" ");
+      const albumName = item.track.album?.name.toLowerCase() || "";
+      const userName = item.user.display_name.toLowerCase();
+
+      return (
+        trackName.includes(query) ||
+        artistNames.includes(query) ||
+        albumName.includes(query) ||
+        userName.includes(query)
+      );
+    });
+  }, [historyItems, searchQuery]);
+
   // Memoize clustered markers based on region zoom level
   const clusteredMarkers = useMemo(() => {
     if (!region) return [];
     // Adjust cluster radius based on zoom level - smaller radius when zoomed in
     const clusterRadius = Math.max(region.latitudeDelta * 0.03, 0.0005);
-    return clusterMarkers(historyItems, region, clusterRadius);
-  }, [historyItems, region?.latitudeDelta]);
+    return clusterMarkers(
+      filteredItems,
+      region,
+      clusterRadius,
+      (item) => item.track.id
+    );
+  }, [filteredItems, region?.latitudeDelta]);
 
+  const mapRef = React.useRef<MapView>(null);
   const handleMarkerPress = useCallback(
     (cluster: ClusteredMarker<GlobalLocationHistoryEntry>) => {
       setSelectedCluster(cluster);
+
+      // Animate to the cluster location with a close-up zoom
+      mapRef.current?.animateToRegion({
+        latitude: cluster.latitude,
+        longitude: cluster.longitude,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      }, 500); // 500ms animation duration
+
+      // Filter out duplicate songs based on track.id
+      const uniqueItems = cluster.items.filter((item, index, self) =>
+        index === self.findIndex((t) => (
+          t.track.id === item.track.id
+        ))
+      );
+
+      // Navigate to location history sheet
+      router.push({
+        pathname: "/location-history",
+        params: {
+          items: JSON.stringify(uniqueItems),
+          count: uniqueItems.length.toString(),
+        },
+      } as any);
     },
     [],
   );
@@ -172,135 +221,42 @@ export default function MapScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {region && (
-        <MapView
-          style={styles.map}
-          initialRegion={region}
-          onRegionChangeComplete={handleRegionChange}
-          showsUserLocation
-          showsMyLocationButton
-          showsPointsOfInterest={false}
-          showsBuildings={false}
-          userInterfaceStyle={isDark ? "dark" : "light"}
-          moveOnMarkerPress={false}
-        >
-          {clusteredMarkers.map((cluster) => (
-            <ClusteredMapMarker
-              key={cluster.id}
-              cluster={cluster}
-              onPress={handleMarkerPress}
-              getImageUrl={getImageUrl}
-            />
-          ))}
-        </MapView>
-      )}
-
-      {/* Selected marker modal */}
-      <Modal
-        visible={selectedCluster !== null}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSelectedCluster(null)}
-      >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setSelectedCluster(null)}
-        >
-          <View
-            style={[
-              styles.modalContent,
-              {
-                backgroundColor: colors.card,
-                paddingBottom: insets.bottom + 16,
-                maxHeight: "70%",
-              },
-            ]}
-            onStartShouldSetResponder={() => true}
+        <>
+          <MapView
+            ref={mapRef}
+            style={styles.map}
+            initialRegion={region}
+            onRegionChangeComplete={handleRegionChange}
+            showsUserLocation
+            showsMyLocationButton
+            showsPointsOfInterest={false}
+            showsBuildings={false}
+            userInterfaceStyle={isDark ? "dark" : "light"}
+            moveOnMarkerPress={false}
           >
-            <View style={styles.modalHandle} />
-            {selectedCluster && (
-              <>
-                <ThemedText style={[styles.clusterInfo, { color: colors.text }]}>
-                  {selectedCluster.count === 1
-                    ? "1 song at this location"
-                    : `${selectedCluster.count} songs at this location`}
-                </ThemedText>
-                <FlatList
-                  data={selectedCluster.items}
-                  keyExtractor={(item) => `${item.id}-${item.played_at}`}
-                  showsVerticalScrollIndicator={true}
-                  style={styles.trackList}
-                  contentContainerStyle={styles.trackListContent}
-                  renderItem={({ item }) => (
-                    <Pressable
-                      style={styles.trackListItem}
-                      onPress={() => {
-                        setSelectedCluster(null);
-                        router.push(`/song/${item.track.id}` as any);
-                      }}
-                    >
-                      {item.track.album?.image_url ? (
-                        <Image
-                          source={{ uri: item.track.album.image_url }}
-                          style={styles.trackListImage}
-                          cachePolicy="memory-disk"
-                        />
-                      ) : (
-                        <View
-                          style={[
-                            styles.trackListImage,
-                            styles.trackImagePlaceholder,
-                          ]}
-                        >
-                          <MaterialIcons
-                            name="music-note"
-                            size={24}
-                            color="#fff"
-                          />
-                        </View>
-                      )}
-                      <View style={styles.trackListDetails}>
-                        <ThemedText
-                          style={[styles.trackListName, { color: colors.text }]}
-                          numberOfLines={1}
-                        >
-                          {item.track.name}
-                        </ThemedText>
-                        <ThemedText
-                          style={[
-                            styles.trackListArtist,
-                            { color: colors.text },
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {item.track.artists.map((a) => a.name).join(", ")}
-                        </ThemedText>
-                        <ThemedText
-                          style={[styles.trackListDate, { color: colors.text }]}
-                        >
-                          {formatDate(item.played_at)}
-                        </ThemedText>
-                      </View>
-                      <MaterialIcons
-                        name="chevron-right"
-                        size={24}
-                        color={colors.icon}
-                      />
-                    </Pressable>
-                  )}
-                  ItemSeparatorComponent={() => (
-                    <View
-                      style={[
-                        styles.trackListSeparator,
-                        { backgroundColor: colors.text },
-                      ]}
-                    />
-                  )}
-                />
-              </>
-            )}
-          </View>
-        </Pressable>
-      </Modal>
+            {clusteredMarkers.map((cluster) => (
+              <ClusteredMapMarker
+                key={cluster.id}
+                cluster={cluster}
+                onPress={handleMarkerPress}
+                getImageUrl={getImageUrl}
+              />
+            ))}
+          </MapView>
+
+          <SearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search songs, artists, or users..."
+            containerStyle={{
+              position: 'absolute',
+              top: insets.top + 10,
+              left: 16,
+              right: 16,
+            }}
+          />
+        </>
+      )}
     </View>
   );
 }
@@ -308,6 +264,7 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    position: "relative",
   },
   centerContent: {
     justifyContent: "center",
@@ -329,72 +286,5 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  modalContent: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
-  },
-  modalHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: "rgba(128,128,128,0.4)",
-    borderRadius: 2,
-    alignSelf: "center",
-    marginBottom: 20,
-  },
-  clusterInfo: {
-    fontSize: 14,
-    fontWeight: "600",
-    opacity: 0.7,
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  trackList: {
-    maxHeight: 400,
-  },
-  trackListContent: {
-    paddingBottom: 8,
-  },
-  trackListItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    gap: 12,
-  },
-  trackListImage: {
-    width: 56,
-    height: 56,
-    borderRadius: 6,
-  },
-  trackImagePlaceholder: {
-    backgroundColor: "#538ce9",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  trackListDetails: {
-    flex: 1,
-    gap: 2,
-  },
-  trackListName: {
-    fontSize: 15,
-    fontWeight: "600",
-    fontFamily: Fonts.rounded,
-  },
-  trackListArtist: {
-    fontSize: 13,
-    opacity: 0.7,
-  },
-  trackListDate: {
-    fontSize: 11,
-    opacity: 0.5,
-  },
-  trackListSeparator: {
-    height: 1,
-    opacity: 0.15,
   },
 });

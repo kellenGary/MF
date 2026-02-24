@@ -203,8 +203,16 @@ public class PlaybackController : ControllerBase
                 var accessToken = await _spotifyTokenService.GetValidAccessTokenAsync(userId);
                 var client = _httpClientFactory.CreateClient("Spotify");
 
+                // If the URI is an album, playlist, or artist, treat it as a context_uri
+                if (string.IsNullOrEmpty(contextUri) && 
+                    (uri.StartsWith("spotify:album:") || uri.StartsWith("spotify:playlist:") || uri.StartsWith("spotify:artist:")))
+                {
+                    contextUri = uri;
+                    uri = null; // No specific track offset
+                }
+
                 // If no context provided and it's a track URI, fetch the track's album to play from context
-                if (string.IsNullOrEmpty(contextUri) && uri.StartsWith("spotify:track:"))
+                if (string.IsNullOrEmpty(contextUri) && uri != null && uri.StartsWith("spotify:track:"))
                 {
                     var trackId = uri.Split(':')[2];
                     var trackInfoRequest = new HttpRequestMessage(HttpMethod.Get, 
@@ -240,9 +248,12 @@ public class PlaybackController : ControllerBase
                 {
                     // If we have a context (album, playlist, artist), play from that context
                     requestBody["context_uri"] = contextUri;
-                    requestBody["offset"] = new Dictionary<string, string> { { "uri", uri } };
+                    if (uri != null)
+                    {
+                        requestBody["offset"] = new Dictionary<string, string> { { "uri", uri } };
+                    }
                 }
-                else
+                else if (uri != null)
                 {
                     // Play just the track (no context - may have limited recommendations)
                     requestBody["uris"] = new[] { uri };

@@ -1,5 +1,6 @@
-import { ThemedText } from '@/components/themed-text';
+import { ThemedText } from '@/components/ui/themed-text';
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { User } from "@/services/api";
 import profileApi from "@/services/profileApi";
 import { router } from "expo-router";
@@ -12,10 +13,10 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface SpotifyProfile {
   display_name?: string;
@@ -25,6 +26,7 @@ interface SpotifyProfile {
 }
 
 export default function ProfileSetupScreen() {
+  const { colors } = useTheme();
   const { updateUser } = useAuth();
   const [loading, setLoading] = useState(true);
   const [appProfile, setAppProfile] = useState<User | null>(null);
@@ -35,6 +37,8 @@ export default function ProfileSetupScreen() {
   const [displayName, setDisplayName] = useState<string>("");
   const [handle, setHandle] = useState<string>("");
   const [bio, setBio] = useState<string>("");
+
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     (async () => {
@@ -95,14 +99,14 @@ export default function ProfileSetupScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={{ flex: 1 }}
+      style={{ flex: 1, paddingTop: insets.top, backgroundColor: colors.background }}
     >
       <ScrollView
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
       >
-        <ThemedText style={styles.title}>Set up your profile</ThemedText>
-        <ThemedText style={styles.subtitle}>
+        <ThemedText type="title" style={{ marginBottom: 8 }}>Set up your profile</ThemedText>
+        <ThemedText type="small" style={{ color: colors.mutedForeground, marginBottom: 16 }}>
           We prefilled info from Spotify. Make it yours.
         </ThemedText>
 
@@ -111,42 +115,45 @@ export default function ProfileSetupScreen() {
         )}
 
         <View style={styles.field}>
-          <ThemedText style={styles.label}>Display Name</ThemedText>
+          <ThemedText type="defaultSemiBold" style={styles.label}>Display Name</ThemedText>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.input }]}
             value={displayName}
             onChangeText={setDisplayName}
             placeholder="Display name"
+            placeholderTextColor={colors.mutedForeground}
           />
         </View>
 
         <View style={styles.field}>
-          <ThemedText style={styles.label}>Handle</ThemedText>
+          <ThemedText type="defaultSemiBold" style={styles.label}>Handle</ThemedText>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.input }]}
             value={handle}
             onChangeText={setHandle}
             autoCapitalize="none"
             placeholder="yourhandle"
+            placeholderTextColor={colors.mutedForeground}
           />
-          <ThemedText style={styles.help}>
-            Handles must be unique; you can change later.
+          <ThemedText type="small" style={{ color: colors.mutedForeground, marginTop: 6 }}>
+            Handles must be unique.
           </ThemedText>
         </View>
 
         <View style={styles.field}>
-          <ThemedText style={styles.label}>Bio</ThemedText>
+          <ThemedText type="defaultSemiBold" style={styles.label}>Bio</ThemedText>
           <TextInput
-            style={[styles.input, styles.textarea]}
+            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.input }]}
             value={bio}
             onChangeText={setBio}
             multiline
             placeholder="Tell us about your music taste"
+            placeholderTextColor={colors.mutedForeground}
           />
         </View>
 
-        <Pressable style={styles.button} onPress={onSave}>
-          <ThemedText style={styles.buttonText}>Save and Continue</ThemedText>
+        <Pressable style={[styles.button, { backgroundColor: colors.accent }]} onPress={onSave}>
+          <ThemedText type="defaultSemiBold" style={{ color: colors.accentForeground }}>Save and Continue</ThemedText>
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -154,30 +161,38 @@ export default function ProfileSetupScreen() {
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  container: { padding: 24 },
-  title: { fontSize: 24, fontWeight: "bold", marginBottom: 8 },
-  subtitle: { fontSize: 14, color: "#666", marginBottom: 16 },
-  avatar: { width: 96, height: 96, borderRadius: 48, marginBottom: 16 },
-  field: { marginBottom: 16 },
-  label: { fontSize: 14, fontWeight: "600", marginBottom: 8 },
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  container: {
+    paddingHorizontal: 16,
+  },
+  avatar: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    marginBottom: 16,
+    alignSelf: "center",
+  },
+  field: {
+    marginBottom: 16,
+  },
+  label: {
+    marginBottom: 8,
+  },
   input: {
     borderWidth: 1,
-    borderColor: "#ddd",
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
-    backgroundColor: "#fff",
   },
-  textarea: { height: 96, textAlignVertical: "top" },
-  help: { fontSize: 12, color: "#888", marginTop: 6 },
   button: {
-    backgroundColor: "#1DB954",
     paddingVertical: 14,
     borderRadius: 24,
     alignItems: "center",
     marginTop: 8,
   },
-  buttonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
 });

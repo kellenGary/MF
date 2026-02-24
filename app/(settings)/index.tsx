@@ -1,4 +1,4 @@
-import { ThemedText } from '@/components/themed-text';
+import { ThemedText } from '@/components/ui/themed-text';
 import { MaterialIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { RelativePathString, router } from "expo-router";
@@ -9,8 +9,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  View,
+  View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -18,23 +17,120 @@ import {
   SettingsRow,
   SettingsSection,
   SettingsSwitch,
-} from "@/components/settings";
+} from "@/components/ui/settings";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import * as ThemeContext from "@/contexts/ThemeContext";
+import { useThemeContext } from "@/contexts/ThemeContext";
 import profileApi from "@/services/profileApi";
+import { LayoutAnimation, Platform, UIManager } from "react-native";
+
+if (
+  Platform.OS === "android" &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+function AppearanceSelector() {
+  const { userTheme, setTheme, theme } = useThemeContext();
+  const [isExpanded, setIsExpanded] = useState(false);
+  const colorScheme = theme;
+  const isDark = colorScheme === "dark";
+  const colors = Colors[isDark ? "dark" : "light"];
+
+  const toggleExpand = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setIsExpanded(!isExpanded);
+  };
+
+  const handleSelect = (newTheme: ThemeContext.UserThemePreference) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setTheme(newTheme);
+  };
+
+  return (
+    <View>
+      <SettingsRow
+        icon="palette"
+        iconColor="#AF52DE"
+        label="Appearance"
+        sublabel={
+          userTheme === "system"
+            ? "System"
+            : userTheme === "dark"
+              ? "Dark"
+              : "Light"
+        }
+        showChevron={!isExpanded}
+        onPress={toggleExpand}
+        rightElement={
+          isExpanded ? (
+            <MaterialIcons name="keyboard-arrow-down" size={22} color={colors.icon} />
+          ) : undefined
+        }
+      />
+      {isExpanded && (
+        <View style={styles.appearanceOptions}>
+          {(["light", "dark", "system"] as const).map((option) => (
+            <Pressable
+              key={option}
+              onPress={() => handleSelect(option)}
+              style={[
+                styles.appearanceOption,
+                {
+                  backgroundColor:
+                    userTheme === option
+                      ? isDark
+                        ? "rgba(255,255,255,0.1)"
+                        : "rgba(0,0,0,0.05)"
+                      : "transparent",
+                },
+              ]}
+            >
+              <ThemedText style={styles.appearanceOptionText}>
+                {option.charAt(0).toUpperCase() + option.slice(1)}
+              </ThemedText>
+              {userTheme === option && (
+                <MaterialIcons name="check" size={20} color={Colors.primary} />
+              )}
+            </Pressable>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
 
 export default function SettingsPage() {
-  const { signOut, user } = useAuth();
+  const { signOut, user, updateUser } = useAuth();
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const { theme } = useThemeContext();
+  const isDark = theme === "dark";
   const colors = Colors[isDark ? "dark" : "light"];
 
   // Toggle states (placeholders for future implementation)
   const [pushNotifications, setPushNotifications] = useState(true);
   const [privateAccount, setPrivateAccount] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const [sessionJoinable, setSessionJoinable] = useState(user?.isSessionJoinable ?? true);
+
+  const handleSessionJoinableChange = useCallback(async (value: boolean) => {
+    setSessionJoinable(value);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      if (user) {
+        await profileApi.updateAppProfile({ isSessionJoinable: value });
+        await updateUser({ ...user, isSessionJoinable: value });
+      }
+    } catch (err) {
+      console.error("Failed to update session visibility:", err);
+      // Revert on failure
+      setSessionJoinable(!value);
+      Alert.alert("Error", "Failed to update session visibility. Please try again.");
+    }
+  }, [user, updateUser]);
 
   const handleSignOut = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -173,22 +269,21 @@ export default function SettingsPage() {
           footer="Private accounts hide your listening activity from other users."
         >
           <SettingsSwitch
+            icon="visibility"
+            iconColor="#007AFF"
+            label="Session Visibility"
+            sublabel="Let friends join your current listening session"
+            value={sessionJoinable}
+            onValueChange={handleSessionJoinableChange}
+          />
+          <SettingsSwitch
             icon="notifications"
             iconColor="#FF9500"
             label="Push Notifications"
             value={pushNotifications}
             onValueChange={setPushNotifications}
           />
-          <SettingsRow
-            icon="palette"
-            iconColor="#AF52DE"
-            label="Appearance"
-            sublabel={isDark ? "Dark" : "Light"}
-            showChevron
-            onPress={() => {
-              // TODO: Implement appearance picker
-            }}
-          />
+          <AppearanceSelector />
           <SettingsSwitch
             icon="lock"
             iconColor="#8E8E93"
@@ -313,5 +408,21 @@ const styles = StyleSheet.create({
   },
   versionText: {
     fontSize: 13,
+  },
+  appearanceOptions: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  appearanceOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 4,
+  },
+  appearanceOptionText: {
+    fontSize: 16,
   },
 });

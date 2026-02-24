@@ -20,7 +20,6 @@ public class TrackData
     public string Name { get; set; } = "";
     public int DurationMs { get; set; }
     public bool Explicit { get; set; }
-    public int? Popularity { get; set; }
     public AlbumData? Album { get; set; }
     public List<ArtistData> Artists { get; set; } = new();
 }
