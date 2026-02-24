@@ -66,7 +66,7 @@ public class DbController : ControllerBase
         {
             var rows = await _context.Database
                 .SqlQueryRaw<Models.DTOs.TrackDetailsViewRow>(@"
-                    SELECT TrackId, TrackSpotifyId, TrackName, DurationMs, ""Explicit"", Popularity,
+                    SELECT TrackId, TrackSpotifyId, TrackName, DurationMs, ""Explicit"",
                            AlbumId, AlbumSpotifyId, AlbumName, AlbumImageUrl, AlbumReleaseDate,
                            ArtistId, ArtistSpotifyId, ArtistName, ArtistOrder
                     FROM TrackDetailsWithArtists
@@ -89,7 +89,6 @@ public class DbController : ControllerBase
                         name = first.TrackName,
                         duration_ms = first.DurationMs,
                         @explicit = first.Explicit,
-                        popularity = first.Popularity,
                         album = first.AlbumId == null ? null : new
                         {
                             id = first.AlbumId,
@@ -156,170 +155,163 @@ public class DbController : ControllerBase
         int failed = 0;
         int artistsAdded = 0;
 
-        // Process in batches of 50 (Spotify API limit for /tracks endpoint)
-        var batches = tracksWithoutAlbum
-            .Select((track, index) => new { track, index })
-            .GroupBy(x => x.index / 50)
-            .Select(g => g.Select(x => x.track).ToList())
-            .ToList();
-
-        foreach (var batch in batches)
+        // Fetch tracks individually with concurrency limit (batch endpoint removed)
+        var semaphore = new SemaphoreSlim(5);
+        var trackResults = new System.Collections.Concurrent.ConcurrentBag<(Track dbTrack, JsonElement trackData)>();
+        var fetchTasks = tracksWithoutAlbum.Select(async dbTrack =>
         {
-            var spotifyIds = string.Join(",", batch.Select(t => t.SpotifyId));
-            var url = $"https://api.spotify.com/v1/tracks?ids={spotifyIds}";
-
+            await semaphore.WaitAsync();
             try
             {
+                var url = $"https://api.spotify.com/v1/tracks/{dbTrack.SpotifyId}";
                 var response = await client.GetAsync(url);
                 if (!response.IsSuccessStatusCode)
                 {
                     var error = await response.Content.ReadAsStringAsync();
-                    _logger.LogError("[BackfillAlbums] Spotify API error: {Error}", error);
-                    failed += batch.Count;
-                    continue;
+                    _logger.LogError("[BackfillAlbums] Spotify API error for track {SpotifyId}: {Error}", dbTrack.SpotifyId, error);
+                    Interlocked.Increment(ref failed);
+                    return;
                 }
 
                 var content = await response.Content.ReadAsStringAsync();
-                var data = JsonSerializer.Deserialize<JsonElement>(content);
+                var trackData = JsonSerializer.Deserialize<JsonElement>(content);
+                trackResults.Add((dbTrack, trackData));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[BackfillAlbums] Error fetching track {SpotifyId}", dbTrack.SpotifyId);
+                Interlocked.Increment(ref failed);
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        });
 
-                if (!data.TryGetProperty("tracks", out var tracksArray))
+        await Task.WhenAll(fetchTasks);
+
+        // Process fetched tracks sequentially (DB operations are not thread-safe)
+        foreach (var (dbTrack, trackData) in trackResults)
+        {
+            try
+            {
+                if (trackData.ValueKind == JsonValueKind.Null)
                 {
-                    failed += batch.Count;
+                    failed++;
                     continue;
                 }
 
-                foreach (var trackData in tracksArray.EnumerateArray())
+                // Process album
+                if (trackData.TryGetProperty("album", out var albumElement) && albumElement.ValueKind != JsonValueKind.Null)
                 {
-                    if (trackData.ValueKind == JsonValueKind.Null)
+                    var albumSpotifyId = albumElement.TryGetProperty("id", out var albumIdProp) ? albumIdProp.GetString() : null;
+                    if (!string.IsNullOrEmpty(albumSpotifyId))
                     {
-                        failed++;
-                        continue;
-                    }
-
-                    var spotifyId = trackData.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
-                    if (string.IsNullOrEmpty(spotifyId)) continue;
-
-                    var dbTrack = batch.FirstOrDefault(t => t.SpotifyId == spotifyId);
-                    if (dbTrack == null) continue;
-
-                    // Process album
-                    if (trackData.TryGetProperty("album", out var albumElement) && albumElement.ValueKind != JsonValueKind.Null)
-                    {
-                        var albumSpotifyId = albumElement.TryGetProperty("id", out var albumIdProp) ? albumIdProp.GetString() : null;
-                        if (!string.IsNullOrEmpty(albumSpotifyId))
+                        var album = await _context.Albums.FirstOrDefaultAsync(a => a.SpotifyId == albumSpotifyId);
+                        if (album == null)
                         {
-                            var album = await _context.Albums.FirstOrDefaultAsync(a => a.SpotifyId == albumSpotifyId);
-                            if (album == null)
+                            // Get image URL
+                            string? imageUrl = null;
+                            if (albumElement.TryGetProperty("images", out var imagesElement) && 
+                                imagesElement.ValueKind == JsonValueKind.Array && 
+                                imagesElement.GetArrayLength() > 0)
                             {
-                                // Get image URL
-                                string? imageUrl = null;
-                                if (albumElement.TryGetProperty("images", out var imagesElement) && 
-                                    imagesElement.ValueKind == JsonValueKind.Array && 
-                                    imagesElement.GetArrayLength() > 0)
-                                {
-                                    imageUrl = imagesElement[0].TryGetProperty("url", out var urlProp) ? urlProp.GetString() : null;
-                                }
+                                imageUrl = imagesElement[0].TryGetProperty("url", out var urlProp) ? urlProp.GetString() : null;
+                            }
 
-                                // Parse release date
-                                DateTime? releaseDate = null;
-                                if (albumElement.TryGetProperty("release_date", out var releaseDateProp))
+                            // Parse release date
+                            DateTime? releaseDate = null;
+                            if (albumElement.TryGetProperty("release_date", out var releaseDateProp))
+                            {
+                                var releaseDateStr = releaseDateProp.GetString();
+                                if (!string.IsNullOrEmpty(releaseDateStr))
                                 {
-                                    var releaseDateStr = releaseDateProp.GetString();
-                                    if (!string.IsNullOrEmpty(releaseDateStr))
+                                    if (DateTime.TryParse(releaseDateStr, out var parsedDate))
                                     {
-                                        if (DateTime.TryParse(releaseDateStr, out var parsedDate))
-                                        {
-                                            releaseDate = parsedDate;
-                                        }
-                                        else if (releaseDateStr.Length == 4 && int.TryParse(releaseDateStr, out var year))
-                                        {
-                                            releaseDate = new DateTime(year, 1, 1);
-                                        }
+                                        releaseDate = parsedDate;
                                     }
-                                }
-
-                                album = new Album
-                                {
-                                    SpotifyId = albumSpotifyId,
-                                    Name = albumElement.TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? "Unknown" : "Unknown",
-                                    ReleaseDate = releaseDate,
-                                    AlbumType = albumElement.TryGetProperty("album_type", out var typeProp) ? typeProp.GetString() : null,
-                                    ImageUrl = imageUrl
-                                };
-
-                                try
-                                {
-                                    _context.Albums.Add(album);
-                                    await _context.SaveChangesAsync();
-                                    _logger.LogDebug("[BackfillAlbums] Created album: {AlbumName}", album.Name);
-                                }
-                                catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("UNIQUE constraint failed") == true)
-                                {
-                                    _context.Entry(album).State = EntityState.Detached;
-                                    album = await _context.Albums.FirstOrDefaultAsync(a => a.SpotifyId == albumSpotifyId);
+                                    else if (releaseDateStr.Length == 4 && int.TryParse(releaseDateStr, out var year))
+                                    {
+                                        releaseDate = new DateTime(year, 1, 1);
+                                    }
                                 }
                             }
 
-                            if (album != null)
+                            album = new Album
                             {
-                                dbTrack.AlbumId = album.Id;
-                                updated++;
-                                _logger.LogDebug("[BackfillAlbums] Updated track {TrackName} with album {AlbumName}", 
-                                    dbTrack.Name, album.Name);
+                                SpotifyId = albumSpotifyId,
+                                Name = albumElement.TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? "Unknown" : "Unknown",
+                                ReleaseDate = releaseDate,
+                                AlbumType = albumElement.TryGetProperty("album_type", out var typeProp) ? typeProp.GetString() : null,
+                                ImageUrl = imageUrl
+                            };
+
+                            try
+                            {
+                                _context.Albums.Add(album);
+                                await _context.SaveChangesAsync();
+                                _logger.LogDebug("[BackfillAlbums] Created album: {AlbumName}", album.Name);
+                            }
+                            catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("UNIQUE constraint failed") == true)
+                            {
+                                _context.Entry(album).State = EntityState.Detached;
+                                album = await _context.Albums.FirstOrDefaultAsync(a => a.SpotifyId == albumSpotifyId);
                             }
                         }
-                    }
 
-                    // Also backfill artists if missing
-                    var existingArtistCount = await _context.TrackArtists.CountAsync(ta => ta.TrackId == dbTrack.Id);
-                    if (existingArtistCount == 0 && trackData.TryGetProperty("artists", out var artistsElement) && 
-                        artistsElement.ValueKind == JsonValueKind.Array)
-                    {
-                        int order = 0;
-                        foreach (var artistElement in artistsElement.EnumerateArray())
+                        if (album != null)
                         {
-                            var artist = await _spotifyDataService.GetOrCreateArtistAsync(artistElement, accessToken);
-
-                            if (artist != null)
-                            {
-                                // Create track-artist relationship if it doesn't exist
-                                var existingTrackArtist = await _context.TrackArtists
-                                    .FirstOrDefaultAsync(ta => ta.TrackId == dbTrack.Id && ta.ArtistId == artist.Id);
-
-                                if (existingTrackArtist == null)
-                                {
-                                    try
-                                    {
-                                        _context.TrackArtists.Add(new TrackArtist
-                                        {
-                                            TrackId = dbTrack.Id,
-                                            ArtistId = artist.Id,
-                                            ArtistOrder = order
-                                        });
-                                        artistsAdded++;
-                                    }
-                                    catch { }
-                                }
-                            }
-                            order++;
+                            dbTrack.AlbumId = album.Id;
+                            updated++;
+                            _logger.LogDebug("[BackfillAlbums] Updated track {TrackName} with album {AlbumName}", 
+                                dbTrack.Name, album.Name);
                         }
                     }
                 }
 
-                await _context.SaveChangesAsync();
-
-                // Rate limiting - wait a bit between batches
-                if (batches.IndexOf(batch) < batches.Count - 1)
+                // Also backfill artists if missing
+                var existingArtistCount = await _context.TrackArtists.CountAsync(ta => ta.TrackId == dbTrack.Id);
+                if (existingArtistCount == 0 && trackData.TryGetProperty("artists", out var artistsElement) && 
+                    artistsElement.ValueKind == JsonValueKind.Array)
                 {
-                    await Task.Delay(100);
+                    int order = 0;
+                    foreach (var artistElement in artistsElement.EnumerateArray())
+                    {
+                        var artist = await _spotifyDataService.GetOrCreateArtistAsync(artistElement, accessToken);
+
+                        if (artist != null)
+                        {
+                            // Create track-artist relationship if it doesn't exist
+                            var existingTrackArtist = await _context.TrackArtists
+                                .FirstOrDefaultAsync(ta => ta.TrackId == dbTrack.Id && ta.ArtistId == artist.Id);
+
+                            if (existingTrackArtist == null)
+                            {
+                                try
+                                {
+                                    _context.TrackArtists.Add(new TrackArtist
+                                    {
+                                        TrackId = dbTrack.Id,
+                                        ArtistId = artist.Id,
+                                        ArtistOrder = order
+                                    });
+                                    artistsAdded++;
+                                }
+                                catch { }
+                            }
+                        }
+                        order++;
+                    }
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "[BackfillAlbums] Error processing batch");
-                failed += batch.Count;
+                _logger.LogError(ex, "[BackfillAlbums] Error processing track {SpotifyId}", dbTrack.SpotifyId);
+                failed++;
             }
         }
+
+        await _context.SaveChangesAsync();
 
         _logger.LogInformation("[BackfillAlbums] Complete: Updated={Updated}, Failed={Failed}, ArtistsAdded={ArtistsAdded}", 
             updated, failed, artistsAdded);
@@ -382,6 +374,7 @@ public class DbController : ControllerBase
         int albumsUpdated = 0;
         int playlistsUpdated = 0;
         int failed = 0;
+        const int SleepTimerMs = 1000; // Delay to respect rate limits
 
         // Backfill albums without TotalTracks
         var albumsWithoutTrackCount = await _context.Albums
@@ -390,64 +383,51 @@ public class DbController : ControllerBase
 
         _logger.LogInformation("[BackfillTrackCounts] Found {Count} albums without TotalTracks", albumsWithoutTrackCount.Count);
 
-        // Process albums in batches of 20 (Spotify API limit for /albums endpoint)
-        var albumBatches = albumsWithoutTrackCount
-            .Select((album, index) => new { album, index })
-            .GroupBy(x => x.index / 20)
-            .Select(g => g.Select(x => x.album).ToList())
-            .ToList();
-
-        foreach (var batch in albumBatches)
+        // Fetch albums sequentially with delay
+        foreach (var dbAlbum in albumsWithoutTrackCount)
         {
-            var spotifyIds = string.Join(",", batch.Select(a => a.SpotifyId));
-            var url = $"https://api.spotify.com/v1/albums?ids={spotifyIds}";
-
             try
             {
+                var url = $"https://api.spotify.com/v1/albums/{dbAlbum.SpotifyId}";
                 var response = await client.GetAsync(url);
+                
+                if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                {
+                    _logger.LogWarning("[BackfillTrackCounts] Rate limited for album {SpotifyId}. Waiting longer...", dbAlbum.SpotifyId);
+                    await Task.Delay(5000); // Wait 5s on 429
+                    
+                    // Retry once
+                    response = await client.GetAsync(url);
+                }
+
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger.LogError("[BackfillTrackCounts] Spotify API error for albums: {Status}", response.StatusCode);
-                    failed += batch.Count;
+                    _logger.LogError("[BackfillTrackCounts] Spotify API error for album {SpotifyId}: {Status}", dbAlbum.SpotifyId, response.StatusCode);
+                    failed++;
                     continue;
                 }
 
                 var content = await response.Content.ReadAsStringAsync();
-                var data = JsonSerializer.Deserialize<JsonElement>(content);
+                var albumData = JsonSerializer.Deserialize<JsonElement>(content);
 
-                if (data.TryGetProperty("albums", out var albumsArray))
+                if (albumData.ValueKind != JsonValueKind.Null && 
+                    albumData.TryGetProperty("total_tracks", out var totalTracksProp))
                 {
-                    foreach (var albumData in albumsArray.EnumerateArray())
-                    {
-                        if (albumData.ValueKind == JsonValueKind.Null) continue;
-
-                        var spotifyId = albumData.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
-                        if (string.IsNullOrEmpty(spotifyId)) continue;
-
-                        var dbAlbum = batch.FirstOrDefault(a => a.SpotifyId == spotifyId);
-                        if (dbAlbum == null) continue;
-
-                        if (albumData.TryGetProperty("total_tracks", out var totalTracksProp))
-                        {
-                            dbAlbum.TotalTracks = totalTracksProp.GetInt32();
-                            albumsUpdated++;
-                        }
-                    }
+                    dbAlbum.TotalTracks = totalTracksProp.GetInt32();
+                    albumsUpdated++;
                 }
 
-                await _context.SaveChangesAsync();
-
-                if (albumBatches.IndexOf(batch) < albumBatches.Count - 1)
-                {
-                    await Task.Delay(100);
-                }
+                // Sleep timer
+                await Task.Delay(SleepTimerMs);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "[BackfillTrackCounts] Error processing album batch");
-                failed += batch.Count;
+                _logger.LogError(ex, "[BackfillTrackCounts] Error fetching album {SpotifyId}", dbAlbum.SpotifyId);
+                failed++;
             }
         }
+
+        await _context.SaveChangesAsync();
 
         // Backfill playlists without TrackCount
         var playlistsWithoutTrackCount = await _context.Playlists
@@ -456,55 +436,155 @@ public class DbController : ControllerBase
 
         _logger.LogInformation("[BackfillTrackCounts] Found {Count} playlists without TrackCount", playlistsWithoutTrackCount.Count);
 
-        // Playlists need to be fetched one at a time (no batch endpoint)
-        foreach (var playlist in playlistsWithoutTrackCount)
-        {
-            var url = $"https://api.spotify.com/v1/playlists/{playlist.SpotifyId}?fields=tracks.total";
+        // 2. Fetch remaining from Spotify AND backfill tracks if missing
+        // Optimization: Only fetch for playlists that likely need it
+        var remainingPlaylists = await _context.Playlists
+            .Where(p => p.SpotifyId != null && (p.TrackCount == null || p.TrackCount == 0))
+            .ToListAsync();
 
+        _logger.LogInformation("[BackfillTrackCounts] Processing {Count} playlists requiring backfill", remainingPlaylists.Count);
+
+        string lastError = null;
+        int processed = 0;
+
+        foreach (var playlist in remainingPlaylists)
+        {
+            processed++;
+            // Check if tracks need backfill (0 tracks in DB)
+            var localCount = await _context.PlaylistTracks.CountAsync(pt => pt.PlaylistId == playlist.Id);
+            
+            // If we have tracks locally, trust that count (unless it's wildly wrong vs TotalTracks? Assuming local truth for now)
+            if (localCount > 0)
+            {
+                if (playlist.TrackCount != localCount)
+                {
+                    playlist.TrackCount = localCount;
+                    playlistsUpdated++;
+                }
+                continue;
+            }
+
+            // If no local tracks, we MUST fetch from Spotify to populate DB
+            var url = $"https://api.spotify.com/v1/playlists/{playlist.SpotifyId}/tracks?limit=100";
+            
             try
             {
                 var response = await client.GetAsync(url);
+                
+                if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                {
+                    _logger.LogWarning("[Backfill] Rate limited for {Id}. Waiting...", playlist.SpotifyId);
+                    await Task.Delay(5000);
+                    response = await client.GetAsync(url);
+                }
+
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger.LogWarning("[BackfillTrackCounts] Failed to fetch playlist {SpotifyId}: {Status}", 
-                        playlist.SpotifyId, response.StatusCode);
-                    failed++;
-                    continue;
+                   if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                   {
+                       _logger.LogWarning("[Backfill] Playlist {Id} not found on Spotify. Removing from DB.", playlist.SpotifyId);
+                       try 
+                       {
+                           _context.Playlists.Remove(playlist);
+                           await _context.SaveChangesAsync();
+                           processed++; // Count as processed since we handled it
+                           continue;
+                       }
+                       catch (Exception ex)
+                       {
+                           _logger.LogError(ex, "Failed to delete not found playlist {Id}", playlist.SpotifyId);
+                       }
+                   }
+
+                   lastError = $"Fetch failed {response.StatusCode} for {playlist.SpotifyId}";
+                   _logger.LogWarning(lastError);
+                   failed++;
+                   continue;
                 }
 
                 var content = await response.Content.ReadAsStringAsync();
                 var data = JsonSerializer.Deserialize<JsonElement>(content);
 
-                if (data.TryGetProperty("tracks", out var tracksProp) && 
-                    tracksProp.TryGetProperty("total", out var totalProp))
+                // Update Count
+                if (data.TryGetProperty("total", out var totalProp))
                 {
-                    playlist.TrackCount = totalProp.GetInt32();
-                    playlistsUpdated++;
+                    var newCount = totalProp.GetInt32();
+                    if (playlist.TrackCount != newCount)
+                    {
+                        playlist.TrackCount = newCount;
+                        playlistsUpdated++;
+                    }
+                }
+                else 
+                {
+                    _logger.LogWarning("[Backfill] 'total' property missing for {Id}", playlist.SpotifyId);
                 }
 
-                await _context.SaveChangesAsync();
+                // Populate Tracks
+                int tracksAdded = 0;
+                if (data.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array)
+                {
+                    int position = 0;
+                    foreach (var item in items.EnumerateArray())
+                    {
+                        if (item.TryGetProperty("track", out var trackElem))
+                        {
+                            var trackSpotifyId = trackElem.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
+                            if (trackSpotifyId != null)
+                            {
+                                var track = await _context.Tracks.FirstOrDefaultAsync(t => t.SpotifyId == trackSpotifyId);
+                                if (track != null)
+                                {
+                                    var exists = await _context.PlaylistTracks.AnyAsync(pt => pt.PlaylistId == playlist.Id && pt.TrackId == track.Id);
+                                    if (!exists)
+                                    {
+                                        _context.PlaylistTracks.Add(new PlaylistTrack
+                                        {
+                                            PlaylistId = playlist.Id,
+                                            TrackId = track.Id,
+                                            Position = position,
+                                            AddedAt = DateTime.UtcNow 
+                                        });
+                                        tracksAdded++;
+                                    }
+                                }
+                            }
+                        }
+                        position++;
+                    }
+                }
+                
+                if (tracksAdded > 0)
+                {
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation("[Backfill] Playlist {Id}: Updated count to {Count}, added {Tracks} tracks", 
+                        playlist.SpotifyId, playlist.TrackCount, tracksAdded);
+                }
+                else if (playlistsUpdated > 0) // Just count update
+                {
+                     await _context.SaveChangesAsync();
+                }
 
-                // Rate limiting
-                await Task.Delay(50);
+                await Task.Delay(SleepTimerMs);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "[BackfillTrackCounts] Error fetching playlist {SpotifyId}", playlist.SpotifyId);
+                lastError = $"Error {playlist.SpotifyId}: {ex.Message}";
+                _logger.LogError(ex, lastError);
                 failed++;
             }
         }
 
-        _logger.LogInformation("[BackfillTrackCounts] Complete: AlbumsUpdated={Albums}, PlaylistsUpdated={Playlists}, Failed={Failed}",
-            albumsUpdated, playlistsUpdated, failed);
-
         return Ok(new
         {
-            message = "Track count backfill complete",
+            message = "Track count and track data backfill complete",
             albumsWithoutTrackCount = albumsWithoutTrackCount.Count,
             albumsUpdated,
             playlistsWithoutTrackCount = playlistsWithoutTrackCount.Count,
+            playlistsProcessed = processed,
             playlistsUpdated,
-            failed
+            failed,
+            lastError
         });
     }
     /// <summary>
@@ -525,10 +605,10 @@ public class DbController : ControllerBase
             return BadRequest("Could not get Spotify access token");
         }
 
-        // Find artists missing data (genres, image, or popularity)
-        // Note: Popularity 0 is valid, but null means missing. GenresJson null means missing.
+        // Find artists missing data (genres or image)
+        // Note: Popularity is no longer returned by Spotify API, so we don't check for it
         var artistsToBackfill = await _context.Artists
-            .Where(a => a.SpotifyId != null && (a.GenresJson == null || a.ImageUrl == null || a.Popularity == null))
+            .Where(a => a.SpotifyId != null && (a.GenresJson == null || a.ImageUrl == null))
             .ToListAsync();
 
         _logger.LogInformation("[BackfillArtists] Found {Count} artists missing rich data", artistsToBackfill.Count);

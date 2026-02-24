@@ -275,7 +275,7 @@ public class PlaylistSyncService : IPlaylistSyncService
                 int position = 0;
                 foreach (var trackItem in spotifyTracks)
                 {
-                    if (!trackItem.TryGetProperty("track", out var trackElement) || 
+                    if (!trackItem.TryGetProperty("item", out var trackElement) || 
                         trackElement.ValueKind == JsonValueKind.Null)
                     {
                         position++;
@@ -366,6 +366,13 @@ public class PlaylistSyncService : IPlaylistSyncService
             var url = $"https://api.spotify.com/v1/playlists/{playlistId}/tracks?limit={limit}&offset={offset}";
             var response = await client.GetAsync(url);
 
+            if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            {
+                _logger.LogWarning("[PlaylistSync] Rate limited fetching tracks for playlist {PlaylistId}. Waiting 5s...", playlistId);
+                await Task.Delay(5000);
+                response = await client.GetAsync(url);
+            }
+
             if (!response.IsSuccessStatusCode)
             {
                 var error = await response.Content.ReadAsStringAsync();
@@ -387,6 +394,9 @@ public class PlaylistSyncService : IPlaylistSyncService
             var total = data.TryGetProperty("total", out var totalProp) ? totalProp.GetInt32() : 0;
             offset += limit;
             hasMore = offset < total;
+            
+            // Respect rate limits during pagination
+            await Task.Delay(100);
         }
 
         return allTracks;
@@ -472,9 +482,7 @@ public class PlaylistSyncService : IPlaylistSyncService
                 : 0,
             Explicit = trackElement.TryGetProperty("explicit", out var explicitProp) 
                 && explicitProp.GetBoolean(),
-            Popularity = trackElement.TryGetProperty("popularity", out var popularityProp) 
-                ? popularityProp.GetInt32() 
-                : null,
+            // Note: Spotify API no longer returns external_ids — ISRC will always be null for new tracks
             Isrc = trackElement.TryGetProperty("external_ids", out var externalIds) &&
                    externalIds.TryGetProperty("isrc", out var isrcProp)
                 ? isrcProp.GetString()

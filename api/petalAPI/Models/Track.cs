@@ -12,7 +12,6 @@ public class Track
     public string Name { get; set; } = string.Empty;
     public int DurationMs { get; set; }
     public bool Explicit { get; set; }
-    public int? Popularity { get; set; }
     public string? Isrc { get; set; }
 
     public int? AlbumId { get; set; }

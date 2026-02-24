@@ -26,40 +26,48 @@ public class AppProfileController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAppProfile()
     {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+        try
         {
-            return Unauthorized(new { error = "Invalid token" });
-        }
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+            {
+                return Unauthorized(new { error = "Invalid token" });
+            }
 
-        var user = await _context.UserProfileData.FindAsync(userId);
-        if (user == null)
+            var user = await _context.UserProfileData.FindAsync(userId);
+            if (user == null)
+            {
+                return NotFound(new { error = "User not found" });
+            }
+
+            // Fetch SpotifyId from Users table since UserProfileData view doesn't include it
+            var spotifyId = await _context.Users
+                .Where(u => u.Id == userId)
+                .Select(u => u.SpotifyId)
+                .FirstOrDefaultAsync();
+
+            return Ok(new {
+                id = user.UserId,
+                spotifyId = spotifyId,
+                displayName = user.DisplayName,
+                handle = user.Handle,
+                bio = user.Bio,
+                profileImageUrl = user.ProfileImageUrl,
+                totalUniqueTracks = user.TotalUniqueTracks,
+                totalPlaybacks = user.TotalPlaybacks,
+                recentPlaysLast7Days = user.RecentPlaysLast7Days,
+                totalArtistsHeard = user.TotalArtistsHeard,
+                totalAlbumsHeard = user.TotalAlbumsHeard,
+                totalFollowers = user.TotalFollowers,
+                totalFollowing = user.TotalFollowing,
+                lastPlayedAt = user.LastPlayedAt
+            });
+        }
+        catch (Exception ex)
         {
-            return NotFound(new { error = "User not found" });
+            _logger.LogError(ex, "Error getting app profile");
+            return StatusCode(500, new { error = "Internal server error", details = ex.Message });
         }
-
-        // Fetch SpotifyId from Users table since UserProfileData view doesn't include it
-        var spotifyId = await _context.Users
-            .Where(u => u.Id == userId)
-            .Select(u => u.SpotifyId)
-            .FirstOrDefaultAsync();
-
-        return Ok(new {
-            id = user.UserId,
-            spotifyId = spotifyId,
-            displayName = user.DisplayName,
-            handle = user.Handle,
-            bio = user.Bio,
-            profileImageUrl = user.ProfileImageUrl,
-            totalUniqueTracks = user.TotalUniqueTracks,
-            totalPlaybacks = user.TotalPlaybacks,
-            recentPlaysLast7Days = user.RecentPlaysLast7Days,
-            totalArtistsHeard = user.TotalArtistsHeard,
-            totalAlbumsHeard = user.TotalAlbumsHeard,
-            totalFollowers = user.TotalFollowers,
-            totalFollowing = user.TotalFollowing,
-            lastPlayedAt = user.LastPlayedAt
-        });
     }
 
     /// <summary>

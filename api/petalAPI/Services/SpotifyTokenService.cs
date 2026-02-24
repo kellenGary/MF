@@ -8,6 +8,19 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace PetalAPI.Services;
 
+/// <summary>
+/// Thrown when Spotify has revoked the user's refresh token (invalid_grant).
+/// The user must re-authenticate via the Spotify OAuth flow.
+/// </summary>
+public class SpotifyAuthRevokedException : Exception
+{
+    public int UserId { get; }
+    public SpotifyAuthRevokedException(int userId, string message) : base(message)
+    {
+        UserId = userId;
+    }
+}
+
 public interface ISpotifyTokenService
 {
     Task<string?> GetValidAccessTokenAsync(int userId, bool autoRefresh = true);
@@ -187,7 +200,30 @@ public class SpotifyTokenService : ISpotifyTokenService
         if (!response.IsSuccessStatusCode)
         {
             var error = await response.Content.ReadAsStringAsync();
-            _logger.LogError("Failed to refresh token: {Error}", error);
+            _logger.LogError("Failed to refresh token for user {UserId}: {Error}", user.Id, error);
+
+            // Detect permanently revoked tokens (invalid_grant)
+            if (error.Contains("invalid_grant", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning(
+                    "Spotify refresh token revoked for user {UserId}. Clearing tokens — user must re-authenticate.",
+                    user.Id);
+
+                // Clear stale tokens so the background sync stops retrying this user
+                user.SpotifyAccessToken = string.Empty;
+                user.SpotifyRefreshToken = string.Empty;
+                user.TokenExpiresAt = DateTime.MinValue;
+                user.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+
+                // Evict cached token
+                _cache.Remove($"spotify_token_{user.Id}");
+
+                throw new SpotifyAuthRevokedException(
+                    user.Id,
+                    "Spotify refresh token has been revoked. User must re-authenticate.");
+            }
+
             throw new Exception($"Failed to refresh Spotify token: {error}");
         }
 

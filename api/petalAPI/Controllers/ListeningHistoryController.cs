@@ -4,6 +4,7 @@ using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using PetalAPI.Services;
 using PetalAPI.Data;
+using PetalAPI.Models;
 
 namespace PetalAPI.Controllers;
 
@@ -197,10 +198,12 @@ public class ListeningHistoryController : ControllerBase
     /// </summary>
     /// <param name="limit">The maximum number of items to return.</param>
     /// <param name="offset">The number of items to skip.</param>
+    /// <param name="days">Optional. Filter to only include tracks from the last N days.</param>
     [HttpGet("enriched")]
     public async Task<IActionResult> GetEnrichedListeningHistory(
         [FromQuery] int limit = 50,
-        [FromQuery] int offset = 0)
+        [FromQuery] int offset = 0,
+        [FromQuery] int? days = null)
     {
         try
         {
@@ -214,9 +217,19 @@ public class ListeningHistoryController : ControllerBase
             if (offset < 0) offset = 0;
 
             // Use the enriched view for better performance
+            // Only include entries that count as meaningful plays (>= 15s)
             var query = _context.ListeningHistoryEnriched
                 .Where(h => h.UserId == userId)
-                .OrderByDescending(h => h.PlayedAt);
+                .Where(h => h.MsPlayed >= 15000);
+
+            // Apply date filter if days is specified
+            if (days.HasValue && days.Value > 0)
+            {
+                var sinceDate = DateTime.UtcNow.AddDays(-days.Value);
+                query = query.Where(h => h.PlayedAt >= sinceDate);
+            }
+
+            query = query.OrderByDescending(h => h.PlayedAt);
 
             var total = await query.CountAsync();
             var items = await query
@@ -258,7 +271,6 @@ public class ListeningHistoryController : ControllerBase
                     name = h.TrackName,
                     duration_ms = h.DurationMs,
                     @explicit = h.Explicit,
-                    popularity = h.Popularity,
                     album = h.AlbumId.HasValue ? new
                     {
                         id = h.AlbumId.Value,
@@ -289,16 +301,162 @@ public class ListeningHistoryController : ControllerBase
     }
 
     /// <summary>
+    /// Retrieves unique tracks listened to by a specific user.
+    /// Deduplicates by Spotify Track ID or Track ID.
+    /// </summary>
+    /// <param name="userId">The ID of the user to retrieve unique tracks for.</param>
+    /// <param name="query">Optional search query to filter by track or artist name.</param>
+    /// <param name="limit">The maximum number of items to return.</param>
+    /// <param name="offset">The number of items to skip.</param>
+    [HttpGet("unique/{userId}")]
+    public async Task<IActionResult> GetUniqueTracks(
+        int userId,
+        [FromQuery] string? query = null,
+        [FromQuery] int limit = 50,
+        [FromQuery] int offset = 0)
+    {
+        try
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null)
+            {
+                return Unauthorized(new { error = "Invalid token" });
+            }
+
+            // Check if the target user exists
+            var targetUser = await _context.Users.FindAsync(userId);
+            if (targetUser == null)
+            {
+                return NotFound(new { error = "User not found" });
+            }
+
+            if (limit < 1 || limit > 1000) limit = 50;
+            if (offset < 0) offset = 0;
+
+            // 1. Get unique Track IDs and their last played time for the user
+            // We filter by user first
+            var userHistoryQuery = _context.ListeningHistory
+                .Where(h => h.UserId == userId && h.CountsAsPlay);
+
+            // If there's a search query, we perform a pre-filter on tracks
+            // Note: complex search + group by is hard for EF.
+            // Best approach: Get potential Track IDs matching search from Tracks table first, if query exists.
+            List<int>? matchingTrackIds = null;
+            if (!string.IsNullOrWhiteSpace(query))
+            {
+                var normalizedQuery = query.Trim().ToLower();
+                matchingTrackIds = await _context.Tracks
+                    .Where(t => t.Name.ToLower().Contains(normalizedQuery) ||
+                                t.TrackArtists.Any(ta => ta.Artist.Name.ToLower().Contains(normalizedQuery)))
+                    .Select(t => t.Id)
+                    .ToListAsync();
+
+                // If search yields no tracks, return empty result immediately
+                if (!matchingTrackIds.Any())
+                {
+                    return Ok(new { total = 0, limit, offset, items = new List<object>() });
+                }
+            }
+
+            // 2. Aggregate history to get distinct tracks and valid pagination
+            var uniqueQuery = userHistoryQuery.AsQueryable();
+
+            if (matchingTrackIds != null)
+            {
+                uniqueQuery = uniqueQuery.Where(h => matchingTrackIds.Contains(h.TrackId));
+            }
+
+            // Group by TrackId to key distinct tracks, select max played date
+            var groupedQuery = uniqueQuery
+                .GroupBy(h => h.TrackId)
+                .Select(g => new
+                {
+                    TrackId = g.Key,
+                    LastPlayed = g.Max(h => h.PlayedAt)
+                });
+
+            // Count total unique items
+            var total = await groupedQuery.CountAsync();
+
+            // 3. Apply pagination on the IDs/Dates
+            var pagedItems = await groupedQuery
+                .OrderByDescending(x => x.LastPlayed)
+                .Skip(offset)
+                .Take(limit)
+                .ToListAsync();
+
+            if (!pagedItems.Any())
+            {
+                return Ok(new { total, limit, offset, items = new List<object>() });
+            }
+
+            // 4. Fetch details for the paged tracks
+            var pagedTrackIds = pagedItems.Select(x => x.TrackId).ToList();
+
+            var trackDetails = await _context.Tracks
+                .Where(t => pagedTrackIds.Contains(t.Id))
+                .Include(t => t.Album)
+                .Include(t => t.TrackArtists)
+                .ThenInclude(ta => ta.Artist)
+                .ToListAsync();
+
+            // 5. Join back in memory to preserve order
+            var resultItems = pagedItems
+                .Join(trackDetails,
+                    p => p.TrackId,
+                    t => t.Id,
+                    (p, t) => new
+                    {
+                        id = t.Id,
+                        spotifyId = t.SpotifyId,
+                        name = t.Name,
+                        durationMs = t.DurationMs,
+                        playedAt = p.LastPlayed,
+                        album = t.Album != null ? new
+                        {
+                            id = t.Album.Id,
+                            name = t.Album.Name,
+                            imageUrl = t.Album.ImageUrl
+                        } : null,
+                        artists = t.TrackArtists
+                            .OrderBy(ta => ta.ArtistOrder)
+                            .Select(ta => new
+                            {
+                                id = ta.Artist.Id,
+                                name = ta.Artist.Name
+                            })
+                            .ToList()
+                    })
+                .ToList();
+
+            return Ok(new
+            {
+                total,
+                limit,
+                offset,
+                items = resultItems
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting unique tracks for user {UserId}", userId);
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+
+    /// <summary>
     /// Retrieves enriched listening history for a specific user.
     /// </summary>
     /// <param name="userId">The ID of the user to retrieve history for.</param>
     /// <param name="limit">The maximum number of items to return.</param>
     /// <param name="offset">The number of items to skip.</param>
+    /// <param name="days">Optional. Filter to only include tracks from the last N days.</param>
     [HttpGet("enriched/{userId}")]
     public async Task<IActionResult> GetEnrichedListeningHistoryByUserId(
         int userId,
         [FromQuery] int limit = 50,
-        [FromQuery] int offset = 0)
+        [FromQuery] int offset = 0,
+        [FromQuery] int? days = null)
     {
         try
         {
@@ -320,9 +478,19 @@ public class ListeningHistoryController : ControllerBase
             if (offset < 0) offset = 0;
 
             // Use the enriched view for better performance
+            // Only include entries that count as meaningful plays (>= 15s)
             var query = _context.ListeningHistoryEnriched
                 .Where(h => h.UserId == userId)
-                .OrderByDescending(h => h.PlayedAt);
+                .Where(h => h.MsPlayed >= 15000);
+
+            // Apply date filter if days is specified
+            if (days.HasValue && days.Value > 0)
+            {
+                var sinceDate = DateTime.UtcNow.AddDays(-days.Value);
+                query = query.Where(h => h.PlayedAt >= sinceDate);
+            }
+
+            query = query.OrderByDescending(h => h.PlayedAt);
 
             var total = await query.CountAsync();
             var items = await query
@@ -364,7 +532,6 @@ public class ListeningHistoryController : ControllerBase
                     name = h.TrackName,
                     duration_ms = h.DurationMs,
                     @explicit = h.Explicit,
-                    popularity = h.Popularity,
                     album = h.AlbumId.HasValue ? new
                     {
                         id = h.AlbumId.Value,
@@ -415,7 +582,7 @@ public class ListeningHistoryController : ControllerBase
             if (offset < 0) offset = 0;
 
             var query = _context.ListeningHistory
-                .Where(h => h.UserId == userId && h.Latitude.HasValue && h.Longitude.HasValue)
+                .Where(h => h.UserId == userId && h.CountsAsPlay && h.Latitude.HasValue && h.Longitude.HasValue)
                 .Include(h => h.Track)
                     .ThenInclude(t => t.Album)
                 .Include(h => h.Track)
@@ -496,7 +663,7 @@ public class ListeningHistoryController : ControllerBase
             if (offset < 0) offset = 0;
 
             var query = _context.ListeningHistory
-                .Where(h => h.Latitude.HasValue && h.Longitude.HasValue)
+                .Where(h => h.CountsAsPlay && h.Latitude.HasValue && h.Longitude.HasValue)
                 .Include(h => h.User)
                 .Include(h => h.Track)
                     .ThenInclude(t => t.Album)
@@ -588,8 +755,9 @@ public class ListeningHistoryController : ControllerBase
             var today = DateTime.UtcNow.Date;
 
             // Get all listening history for the user with track info
+            // Only include entries that count as meaningful plays
             var listeningHistory = await _context.ListeningHistory
-                .Where(h => h.UserId == userId)
+                .Where(h => h.UserId == userId && h.CountsAsPlay)
                 .Include(h => h.Track)
                 .Select(h => new { h.Track.SpotifyId, PlayedDate = h.PlayedAt.Date })
                 .ToListAsync();
@@ -657,6 +825,87 @@ public class ListeningHistoryController : ControllerBase
         }
 
         return streak;
+    }
+    /// <summary>
+    /// Seeds the listening history with dummy data containing random global locations for testing map visualization.
+    /// </summary>
+    /// <param name="count">The number of entries to generate (default 50).</param>
+    [HttpPost("seed")]
+    public async Task<IActionResult> SeedListeningHistory([FromQuery] int count = 50)
+    {
+        try
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+            {
+                return Unauthorized(new { error = "Invalid token" });
+            }
+
+            if (count < 1 || count > 1000) count = 50;
+
+            // Get some tracks to use
+            // Fetch first 100 tracks and pick randomly in memory to avoid LINQ translation issues with Guid.NewGuid()
+            var candidateTracks = await _context.Tracks
+                .Take(100)
+                .ToListAsync();
+            
+            if (!candidateTracks.Any())
+            {
+                return BadRequest(new { error = "No tracks found in database to seed with" });
+            }
+            
+            var random = new Random();
+            var tracks = candidateTracks.OrderBy(x => random.Next()).Take(20).ToList();
+
+            if (!tracks.Any())
+            {
+                return BadRequest(new { error = "No tracks found in database to seed with" });
+            }
+
+
+            var historyEntries = new List<ListeningHistory>();
+            var now = DateTime.UtcNow;
+
+            for (int i = 0; i < count; i++)
+            {
+                var track = tracks[random.Next(tracks.Count)];
+                
+                // Generate random location
+                // Latitude: -90 to 90
+                var latitude = random.NextDouble() * 180 - 90;
+                // Longitude: -180 to 180
+                var longitude = random.NextDouble() * 360 - 180;
+
+                historyEntries.Add(new ListeningHistory
+                {
+                    UserId = userId,
+                    TrackId = track.Id,
+                    PlayedAt = now.AddMinutes(-random.Next(1, 10000)), // Random time in past
+                    MsPlayed = track.DurationMs,
+                    ContextUri = null,
+                    DeviceType = "generated_seed",
+                    Source = ListeningSource.App,
+                    Latitude = latitude,
+                    Longitude = longitude,
+                    LocationAccuracy = 10.0,
+                    DedupeKey = Guid.NewGuid().ToString() // Ensure uniqueness
+                });
+            }
+
+            _context.ListeningHistory.AddRange(historyEntries);
+            await _context.SaveChangesAsync();
+
+            return Ok(new 
+            { 
+                message = $"Successfully seeded {count} listening history entries",
+                locations = historyEntries.Select(h => new { h.Latitude, h.Longitude })
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error seeding listening history");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
     }
 }
 

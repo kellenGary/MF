@@ -7,22 +7,30 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import "react-native-reanimated";
+import {
+  configureReanimatedLogger,
+  ReanimatedLogLevel,
+} from "react-native-reanimated";
 
-import { Colors } from "@/constants/theme";
+// This is the default configuration for the logger, but with strict mode disabled.
+configureReanimatedLogger({
+  level: ReanimatedLogLevel.warn,
+  strict: false,
+});
+
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ListeningHistoryProvider } from "@/contexts/ListeningHistoryContext";
 import { LocationProvider } from "@/contexts/LocationContext";
 import { PlaybackProvider } from "@/contexts/playbackContext";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { ScrollProvider } from "@/contexts/ScrollContext";
+import * as ThemeContext from "@/contexts/ThemeContext";
+import { registerBackgroundFetchAsync } from "@/services/backgroundService";
 
 function RootLayoutNav() {
   const { isAuthenticated, isLoading, user } = useAuth();
   const segments = useSegments();
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const colors = Colors[isDark ? "dark" : "light"];
+  const { colors, isDark } = ThemeContext.useTheme();
 
   useEffect(() => {
     if (isLoading) return;
@@ -106,32 +114,79 @@ function RootLayoutNav() {
           contentStyle: { backgroundColor: colors.background },
         }}
       />
+      <Stack.Screen
+        name="location-history"
+        options={{
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.5],
+          sheetGrabberVisible: true,
+          contentStyle: { backgroundColor: colors.background },
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="profile/followers"
+        options={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      />
+      <Stack.Screen
+        name="profile/following-users"
+        options={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      />
+      <Stack.Screen
+        name="profile/unique-songs"
+        options={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      />
     </Stack>
   );
 }
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
+function AppContent() {
+  const { isDark } = ThemeContext.useTheme();
 
+  return (
+    <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+      <RootLayoutNav />
+      <StatusBar
+        style={isDark ? "light" : "dark"}
+        translucent
+      />
+    </ThemeProvider>
+  );
+}
+
+export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
         <LocationProvider>
           <PlaybackProvider>
             <ListeningHistoryProvider>
-              <ThemeProvider
-                value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
-              >
-                <RootLayoutNav />
-                <StatusBar
-                  style={colorScheme === "dark" ? "light" : "dark"}
-                  translucent
-                />
-              </ThemeProvider>
+              <ThemeContext.ThemeProvider>
+                <ScrollProvider>
+                  <AppContent />
+                </ScrollProvider>
+              </ThemeContext.ThemeProvider>
             </ListeningHistoryProvider>
           </PlaybackProvider>
         </LocationProvider>
       </AuthProvider>
+      <BackgroundFetchRegistrar />
     </GestureHandlerRootView>
   );
+}
+
+function BackgroundFetchRegistrar() {
+  useEffect(() => {
+    registerBackgroundFetchAsync();
+  }, []);
+  return null;
 }
