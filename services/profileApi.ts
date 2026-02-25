@@ -15,6 +15,21 @@ export interface ProfileData {
   totalFollowers: number;
   totalFollowing: number;
   lastPlayedAt: Date;
+  isSessionJoinable: boolean;
+}
+
+export interface CompatibilityBreakdownFactor {
+  name: string;
+  score: number;
+  count: number;
+  label: string;
+  hasData: boolean;
+}
+
+export interface CompatibilityResult {
+  score: number;
+  insufficientData: boolean;
+  breakdown: CompatibilityBreakdownFactor[];
 }
 
 class ProfileApiService {
@@ -31,12 +46,32 @@ class ProfileApiService {
   }
 
   async updateAppProfile(
-    payload: Partial<Pick<User, "displayName" | "handle" | "bio">>,
+    payload: Partial<
+      Pick<User, "displayName" | "handle" | "bio" | "isSessionJoinable">
+    >,
   ): Promise<User> {
     const response = await api.makeAuthenticatedRequest("/api/profile/app", {
       method: "PUT",
       body: JSON.stringify(payload),
     });
+    return await response.json();
+  }
+
+  async getCurrentPlayback(
+    userId: number,
+  ): Promise<{
+    isPlaying: boolean;
+    track?: { id: string; name: string; uri: string };
+  }> {
+    const response = await api.makeAuthenticatedRequest(
+      `/api/profile/app/${userId}/current-playback`,
+    );
+    if (!response.ok) {
+      if (response.status === 403 || response.status === 404) {
+        return { isPlaying: false };
+      }
+      throw new Error("Failed to fetch current playback");
+    }
     return await response.json();
   }
 
@@ -70,6 +105,13 @@ class ProfileApiService {
       ? `/api/SongOfTheDay/${userId}`
       : "/api/SongOfTheDay";
     const response = await api.makeAuthenticatedRequest(endpoint);
+    return await response.json();
+  }
+
+  async getCompatibility(userId: number): Promise<CompatibilityResult> {
+    const response = await api.makeAuthenticatedRequest(
+      `/api/users/${userId}/compatibility`,
+    );
     return await response.json();
   }
 }

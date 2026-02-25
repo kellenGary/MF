@@ -13,25 +13,17 @@ interface SharedTrackPostProps {
   onDelete?: (postId: number) => void;
 }
 
-const SCREEN_WIDTH = Dimensions.get("window").width;
-
 export default function SharedTrackPost({ item, onDelete }: SharedTrackPostProps) {
   const { colors } = useTheme();
-  const { user: currentUser } = useAuth();
 
   const timeAgo = feedApi.getTimeAgo(item.createdAt);
   const caption = feedApi.getCaption(item);
   const track = item.track;
-  const user = item.user;
 
   if (!track) return null;
 
   const handlePress = () => {
     router.push(`/song/${track.id}`);
-  };
-
-  const handleProfilePress = () => {
-    router.push(`/profile/${user.id === currentUser?.id ? "" : user.id}`);
   };
 
   return (

@@ -103,7 +103,7 @@ function AppearanceSelector() {
 }
 
 export default function SettingsPage() {
-  const { signOut, user } = useAuth();
+  const { signOut, user, updateUser } = useAuth();
   const insets = useSafeAreaInsets();
   const { theme } = useThemeContext();
   const isDark = theme === "dark";
@@ -113,6 +113,24 @@ export default function SettingsPage() {
   const [pushNotifications, setPushNotifications] = useState(true);
   const [privateAccount, setPrivateAccount] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const [sessionJoinable, setSessionJoinable] = useState(user?.isSessionJoinable ?? true);
+
+  const handleSessionJoinableChange = useCallback(async (value: boolean) => {
+    setSessionJoinable(value);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      if (user) {
+        await profileApi.updateAppProfile({ isSessionJoinable: value });
+        await updateUser({ ...user, isSessionJoinable: value });
+      }
+    } catch (err) {
+      console.error("Failed to update session visibility:", err);
+      // Revert on failure
+      setSessionJoinable(!value);
+      Alert.alert("Error", "Failed to update session visibility. Please try again.");
+    }
+  }, [user, updateUser]);
 
   const handleSignOut = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -250,6 +268,14 @@ export default function SettingsPage() {
           title="Preferences"
           footer="Private accounts hide your listening activity from other users."
         >
+          <SettingsSwitch
+            icon="visibility"
+            iconColor="#007AFF"
+            label="Session Visibility"
+            sublabel="Let friends join your current listening session"
+            value={sessionJoinable}
+            onValueChange={handleSessionJoinableChange}
+          />
           <SettingsSwitch
             icon="notifications"
             iconColor="#FF9500"

@@ -1,4 +1,8 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using PetalAPI.Data;
 using PetalAPI.Services;
 
 namespace PetalAPI.Controllers;
@@ -11,17 +15,20 @@ public class AuthController : ControllerBase
     private readonly IJwtService _jwtService;
     private readonly ISpotifyAuthService _spotifyAuthService;
     private readonly IUserService _userService;
+    private readonly AppDbContext _context;
 
     public AuthController(
         ILogger<AuthController> logger,
         IJwtService jwtService,
         ISpotifyAuthService spotifyAuthService,
-        IUserService userService)
+        IUserService userService,
+        AppDbContext context)
     {
         _logger = logger;
         _jwtService = jwtService;
         _spotifyAuthService = spotifyAuthService;
         _userService = userService;
+        _context = context;
     }
 
     /// <summary>
@@ -92,5 +99,40 @@ public class AuthController : ControllerBase
             _logger.LogError(ex, "[API] Error during callback");
             return StatusCode(500, new { error = "Internal server error", details = ex.Message });
         }
+    }
+
+    /// <summary>
+    /// Validates the current JWT and returns the up-to-date user record.
+    /// Returns 401 if the token is valid but the user no longer exists in the database
+    /// (e.g. after a database wipe), so the client can clear its cached credentials.
+    /// </summary>
+    [Authorize]
+    [HttpGet("me")]
+    public async Task<IActionResult> Me()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+        {
+            return Unauthorized(new { error = "Invalid token" });
+        }
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null)
+        {
+            _logger.LogWarning("[API] /me called with valid JWT but user {UserId} not found in DB", userId);
+            return Unauthorized(new { error = "User not found" });
+        }
+
+        return Ok(new
+        {
+            id = user.Id,
+            spotifyId = user.SpotifyId,
+            displayName = user.DisplayName,
+            handle = user.Handle,
+            bio = user.Bio,
+            email = user.Email,
+            profileImageUrl = user.ProfileImageUrl,
+            hasCompletedProfile = user.HasCompletedProfile
+        });
     }
 }

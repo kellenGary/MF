@@ -444,7 +444,7 @@ public class DbController : ControllerBase
 
         _logger.LogInformation("[BackfillTrackCounts] Processing {Count} playlists requiring backfill", remainingPlaylists.Count);
 
-        string lastError = null;
+        string? lastError = null;
         int processed = 0;
 
         foreach (var playlist in remainingPlaylists)

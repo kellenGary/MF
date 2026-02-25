@@ -17,9 +17,36 @@ export interface SearchTrack {
   artistName?: string;
 }
 
+export interface SearchAlbum {
+  id: number;
+  spotifyId: string;
+  name: string;
+  imageUrl?: string;
+  albumType?: string;
+  totalTracks?: number;
+}
+
+export interface SearchArtist {
+  id: number;
+  spotifyId: string;
+  name: string;
+  imageUrl?: string;
+}
+
+export interface SearchPlaylist {
+  id: number;
+  spotifyId: string;
+  name: string;
+  imageUrl?: string;
+  trackCount?: number;
+}
+
 export interface SearchResults {
   users: SearchUser[];
   tracks: SearchTrack[];
+  albums: SearchAlbum[];
+  artists: SearchArtist[];
+  playlists: SearchPlaylist[];
 }
 
 class SearchApiService {

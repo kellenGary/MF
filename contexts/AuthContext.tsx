@@ -20,6 +20,7 @@ interface User {
   email: string | null;
   profileImageUrl: string | null;
   hasCompletedProfile: boolean;
+  isSessionJoinable: boolean;
 }
 
 interface AuthContextType {
@@ -111,15 +112,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const token = await SecureStore.getItemAsync("jwt_token");
       const userStr = await SecureStore.getItemAsync("user");
-      setJwtToken(token);
-      // Sync token to API service
-      api.setAuthToken(token);
-      if (userStr) {
-        setUser(JSON.parse(userStr));
-        // Fetch profile data in background if we have a user
-        fetchUserProfile();
+
+      if (token) {
+        // Sync token to API service so validateStoredToken can use it
+        api.setAuthToken(token);
+
+        // Validate the token against the server. This catches cases where the
+        // user was deleted (e.g. after a DB wipe) and ensures cached user data
+        // (like hasCompletedProfile) is always fresh from the server.
+        const freshUser = await api.validateStoredToken();
+
+        if (freshUser) {
+          // Token is valid and user exists — persist fresh user data
+          await SecureStore.setItemAsync("user", JSON.stringify(freshUser));
+          setJwtToken(token);
+          setUser(freshUser);
+          fetchUserProfile();
+          console.log("[AuthContext] Token validated, user:", freshUser.id);
+        } else {
+          // Token is invalid or user no longer exists — clear everything
+          console.log("[AuthContext] Stored token is invalid or user not found, clearing credentials");
+          await SecureStore.deleteItemAsync("jwt_token");
+          await SecureStore.deleteItemAsync("user");
+          api.setAuthToken(null);
+          setJwtToken(null);
+          setUser(null);
+        }
+      } else if (userStr) {
+        // No token but stale user data — clear it
+        await SecureStore.deleteItemAsync("user");
       }
-      console.log("[AuthContext] Loaded auth data:", token);
     } catch (error) {
       console.error("Failed to load auth data:", error);
     } finally {

@@ -275,12 +275,26 @@ public class ListeningHistoryService : IListeningHistoryService
                         var artist = await _spotifyDataService.GetOrCreateArtistAsync(artistElement, accessToken);
                         if (artist != null)
                         {
-                            _context.TrackArtists.Add(new TrackArtist
+                            var existingLink = await _context.TrackArtists
+                                .FirstOrDefaultAsync(ta => ta.TrackId == dbTrack.Id && ta.ArtistId == artist.Id);
+                            if (existingLink == null)
                             {
-                                TrackId = dbTrack.Id,
-                                ArtistId = artist.Id,
-                                ArtistOrder = order++
-                            });
+                                try
+                                {
+                                    _context.TrackArtists.Add(new TrackArtist
+                                    {
+                                        TrackId = dbTrack.Id,
+                                        ArtistId = artist.Id,
+                                        ArtistOrder = order
+                                    });
+                                    await _context.SaveChangesAsync();
+                                }
+                                catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("UNIQUE constraint failed") == true)
+                                {
+                                    _logger.LogDebug("[ListeningHistory] TrackArtist already exists for track {TrackId}, artist {ArtistId}", dbTrack.Id, artist.Id);
+                                }
+                            }
+                            order++;
                         }
                     }
                 }

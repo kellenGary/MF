@@ -85,9 +85,6 @@ export default function SharedArtistPost({ item, onDelete }: SharedArtistPostPro
                 numberOfLines={6}
               >
                 {caption}
-                <ThemedText type="defaultSemiBold" style={[styles.seeMore, { color: colors.text }]}>
-                  {"\n"}See more
-                </ThemedText>
               </ThemedText>
             )}
           </View>

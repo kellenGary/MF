@@ -30,15 +30,15 @@ public class SearchController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(q))
         {
-            return Ok(new { users = new List<object>(), tracks = new List<object>() });
+            return Ok(new { users = new List<object>(), tracks = new List<object>(), albums = new List<object>(), artists = new List<object>(), playlists = new List<object>() });
         }
 
         var query = q.ToLower().Trim();
 
         // Search users by display name or handle
         var users = await _context.Users
-            .Where(u => u.DisplayName.ToLower().Contains(query) || 
-                        u.Handle.ToLower().Contains(query))
+            .Where(u => (u.DisplayName != null && u.DisplayName.ToLower().Contains(query)) || 
+                        (u.Handle != null && u.Handle.ToLower().Contains(query)))
             .Take(limit)
             .Select(u => new
             {
@@ -70,6 +70,48 @@ public class SearchController : ControllerBase
             })
             .ToListAsync();
 
-        return Ok(new { users, tracks });
+        // Search albums by name
+        var albums = await _context.Albums
+            .Where(a => a.Name.ToLower().Contains(query))
+            .Take(limit)
+            .Select(a => new
+            {
+                id = a.Id,
+                spotifyId = a.SpotifyId,
+                name = a.Name,
+                imageUrl = a.ImageUrl,
+                albumType = a.AlbumType,
+                totalTracks = a.TotalTracks
+            })
+            .ToListAsync();
+
+        // Search artists by name
+        var artists = await _context.Artists
+            .Where(a => a.Name.ToLower().Contains(query))
+            .Take(limit)
+            .Select(a => new
+            {
+                id = a.Id,
+                spotifyId = a.SpotifyId,
+                name = a.Name,
+                imageUrl = a.ImageUrl
+            })
+            .ToListAsync();
+
+        // Search playlists by name (public only)
+        var playlists = await _context.Playlists
+            .Where(p => p.Public && p.Name.ToLower().Contains(query))
+            .Take(limit)
+            .Select(p => new
+            {
+                id = p.Id,
+                spotifyId = p.SpotifyId,
+                name = p.Name,
+                imageUrl = p.ImageUrl,
+                trackCount = p.TrackCount
+            })
+            .ToListAsync();
+
+        return Ok(new { users, tracks, albums, artists, playlists });
     }
 }
