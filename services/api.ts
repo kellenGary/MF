@@ -226,5 +226,28 @@ class ApiService {
     );
     if (!response.ok) throw new Error("Failed to delete comment");
   }
+
+  /**
+   * Validates a stored JWT by hitting /api/auth/me.
+   * Returns the fresh server-side user if the token is valid and the user still
+   * exists in the database. Returns null if the token is expired, invalid, or
+   * the user has been deleted (e.g. after a DB wipe).
+   */
+  async validateStoredToken(): Promise<User | null> {
+    if (!this.token) return null;
+    try {
+      const response = await fetch(`${API_URL}/api/auth/me`, {
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) return null;
+      const user: User = await response.json();
+      return user;
+    } catch {
+      return null;
+    }
+  }
 }
 export default new ApiService();

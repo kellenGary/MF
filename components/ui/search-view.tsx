@@ -22,20 +22,26 @@ export default function SearchView({ query }: SearchViewProps) {
     const insets = useSafeAreaInsets();
     const { collapse } = useScrollContext();
 
-    const [results, setResults] = useState<SearchResults>({ users: [], tracks: [] });
+    const [results, setResults] = useState<SearchResults>({ users: [], tracks: [], albums: [], artists: [], playlists: [] });
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         const fetchResults = async () => {
             if (!query.trim()) {
-                setResults({ users: [], tracks: [] });
+                setResults({ users: [], tracks: [], albums: [], artists: [], playlists: [] });
                 return;
             }
 
             setLoading(true);
             try {
                 const data = await searchApi.search(query);
-                setResults(data);
+                setResults({
+                    users: data.users ?? [],
+                    tracks: data.tracks ?? [],
+                    albums: data.albums ?? [],
+                    artists: data.artists ?? [],
+                    playlists: data.playlists ?? [],
+                });
             } catch (error) {
                 console.error("Search error:", error);
             } finally {
@@ -71,17 +77,56 @@ export default function SearchView({ query }: SearchViewProps) {
             type: "song" as const,
         }));
 
-        return [...users, ...tracks];
+        const albums: ListItem[] = results.albums.map((album) => ({
+            id: `album-${album.id}`,
+            name: album.name,
+            subtitle: `${album.albumType ?? "Album"}${album.totalTracks ? ` • ${album.totalTracks} tracks` : ""}`,
+            imageUrl: album.imageUrl,
+            type: "album" as const,
+        }));
+
+        const artists: ListItem[] = results.artists.map((artist) => ({
+            id: `artist-${artist.id}`,
+            name: artist.name,
+            subtitle: "Artist",
+            imageUrl: artist.imageUrl,
+            type: "artist" as const,
+        }));
+
+        const playlists: ListItem[] = results.playlists.map((playlist) => ({
+            id: `playlist-${playlist.id}`,
+            name: playlist.name,
+            subtitle: playlist.trackCount != null ? `${playlist.trackCount} tracks` : "Playlist",
+            imageUrl: playlist.imageUrl,
+            type: "playlist" as const,
+        }));
+
+        return [...users, ...tracks, ...albums, ...artists, ...playlists];
     }, [results]);
 
     const handleItemPress = (item: ListItem) => {
         if (item.type === "user") {
             const userId = item.id.replace("user-", "");
             router.push(`/profile/${userId}`);
-        } else {
+        } else if (item.type === "song") {
             const track = results.tracks.find((t) => `track-${t.id}` === item.id);
             if (track) {
                 router.push(`/song/${track.spotifyId}`);
+            }
+        } else if (item.type === "album") {
+            const album = results.albums.find((a) => `album-${a.id}` === item.id);
+            if (album) {
+                router.push(`/album/${album.spotifyId}`);
+            }
+        } else if (item.type === "artist") {
+            const artist = results.artists.find((a) => `artist-${a.id}` === item.id);
+            if (artist) {
+                router.push(`/artist/${artist.spotifyId}`);
+            }
+        } else if (item.type === "playlist") {
+            const playlist = results.playlists.find((p) => `playlist-${p.id}` === item.id);
+            if (playlist) {
+                router.push(`/playlist/${playlist.spotifyId}`);
             }
         }
     };
@@ -101,7 +146,7 @@ export default function SearchView({ query }: SearchViewProps) {
             {!hasResults && query.trim() ? (
                 <View style={styles.emptyContainer}>
                     <ThemedText style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                        No results found for "{query}"
+                        No results found for &ldquo;{query}&rdquo;
                     </ThemedText>
                 </View>
             ) : (

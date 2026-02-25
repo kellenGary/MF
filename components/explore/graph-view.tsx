@@ -46,7 +46,7 @@ interface SimNode extends SimulationNodeDatum {
 }
 
 interface SimLink extends SimulationLinkDatum<SimNode> {
-  isDirect: boolean;
+  linkType: 'direct' | 'mutual' | 'degree2';
 }
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
@@ -315,7 +315,7 @@ export default function GraphView({
           linkList.push({
             source: currentUser.id,
             target: Number(userId),
-            isDirect: true, // Degree 1 connection
+            linkType: 'direct',
           });
         }
       });
@@ -325,11 +325,25 @@ export default function GraphView({
       if (!nodeIdSet.has(conn.followerId) || !nodeIdSet.has(conn.followeeId)) return;
       if (currentUser && conn.followerId === currentUser.id) return;
 
-      linkList.push({
-        source: conn.followerId,
-        target: conn.followeeId,
-        isDirect: false, // Degree 2 connection
-      });
+      const sourceFollowed = directFollowIDs.has(conn.followerId);
+      const targetFollowed = directFollowIDs.has(conn.followeeId);
+
+      if (sourceFollowed && targetFollowed) {
+        // Both are users the current user follows and they follow each other
+        linkList.push({
+          source: conn.followerId,
+          target: conn.followeeId,
+          linkType: 'mutual',
+        });
+      } else if (sourceFollowed || targetFollowed) {
+        // One degree of separation — one endpoint is followed, the other is not
+        linkList.push({
+          source: conn.followerId,
+          target: conn.followeeId,
+          linkType: 'degree2',
+        });
+      }
+      // Neither endpoint is followed by current user — skip
     });
 
     return { nodes: nodeList, links: linkList };
@@ -345,12 +359,11 @@ export default function GraphView({
         forceLink<SimNode, SimLink>(links)
           .id((d) => d.id)
           .distance((d) => {
-            // Dynamic link distance
-            if (d.isDirect) return 200; // Long leash for center -> Degree 1
+            if (d.linkType === 'direct') return 200; // Long leash for center -> Degree 1
             return 60; // Short leash for Degree 1 -> Degree 2 (tight clusters)
           })
           .strength((d) => {
-            if (d.isDirect) return 0.1; // Softer pull from center
+            if (d.linkType === 'direct') return 0.1; // Softer pull from center
             return 0.8; // Strong pull to keep clusters together
           })
       )
@@ -460,10 +473,23 @@ export default function GraphView({
 
                 if (!sourcePos || !targetPos) return null;
 
-                const isFollowedConnection = !link.isDirect && (
-                  followStatus[Number(sourceId)] || followStatus[Number(targetId)]
-                );
-                const isSolid = link.isDirect || isFollowedConnection;
+                // linkType controls color and opacity:
+                // 'direct'  → blue line from current user to each followed user
+                // 'mutual'  → blue line between two users that the current user
+                //              follows and who also follow each other
+                // 'degree2' → faint white line showing 1 degree of separation
+                //              (one endpoint is followed, the other is not)
+                const stroke =
+                  link.linkType === 'direct' || link.linkType === 'mutual'
+                    ? Colors.primary
+                    : "#FFFFFF";
+                const strokeWidth = link.linkType === 'degree2' ? 0.5 : 0.8;
+                const opacity =
+                  link.linkType === 'direct'
+                    ? 0.8
+                    : link.linkType === 'mutual'
+                    ? 0.55
+                    : 0.25;
 
                 return (
                   <Line
@@ -472,9 +498,9 @@ export default function GraphView({
                     y1={sourcePos.y}
                     x2={targetPos.x}
                     y2={targetPos.y}
-                    stroke={link.isDirect ? Colors.primary : "#FFFFFF"}
-                    strokeWidth={isSolid ? 0.5 : 1}
-                    opacity={link.isDirect ? 0.8 : (isFollowedConnection ? 0.6 : 0.4)}
+                    stroke={stroke}
+                    strokeWidth={strokeWidth}
+                    opacity={opacity}
                   />
                 );
               })}

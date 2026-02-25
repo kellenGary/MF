@@ -132,6 +132,14 @@ using (var scope = app.Services.CreateScope())
     // Apply migrations
     db.Database.Migrate();
 
+    // Enable WAL mode for SQLite (improves concurrent read/write performance).
+    // This must be set as a PRAGMA, not in the connection string.
+    if (string.Equals(dbProvider, "Sqlite", StringComparison.OrdinalIgnoreCase))
+    {
+        db.Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL;");
+        db.Database.ExecuteSqlRaw("PRAGMA busy_timeout=5000;");
+    }
+
     // Apply SQL views from script
     try
     {
