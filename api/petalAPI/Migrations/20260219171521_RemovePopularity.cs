@@ -15,6 +15,11 @@ namespace PetalAPI.Migrations
             migrationBuilder.Sql(@"ALTER TABLE ""Tracks"" DROP COLUMN IF EXISTS ""Popularity"" CASCADE;");
             migrationBuilder.Sql(@"ALTER TABLE ""Artists"" DROP COLUMN IF EXISTS ""Popularity"" CASCADE;");
 
+            // All remaining AlterColumn calls are SQLite-specific type normalizations.
+            // Postgres columns are already the correct native types, so skip them.
+            if (migrationBuilder.ActiveProvider != "Microsoft.EntityFrameworkCore.Sqlite")
+                return;
+
             migrationBuilder.AlterColumn<DateTime>(
                 name: "UpdatedAt",
                 table: "Users",
@@ -1256,6 +1261,9 @@ namespace PetalAPI.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            // AlterColumn calls are SQLite-specific type normalizations; skip on Postgres.
+            if (migrationBuilder.ActiveProvider == "Microsoft.EntityFrameworkCore.Sqlite")
+            {
             migrationBuilder.AlterColumn<DateTime>(
                 name: "UpdatedAt",
                 table: "Users",
@@ -1549,6 +1557,7 @@ namespace PetalAPI.Migrations
                 oldType: "INTEGER")
                 .Annotation("Sqlite:Autoincrement", true)
                 .OldAnnotation("Sqlite:Autoincrement", true);
+            } // end SQLite-only guard
 
             migrationBuilder.AddColumn<int>(
                 name: "Popularity",
@@ -1556,6 +1565,8 @@ namespace PetalAPI.Migrations
                 type: "integer",
                 nullable: true);
 
+            if (migrationBuilder.ActiveProvider == "Microsoft.EntityFrameworkCore.Sqlite")
+            {
             migrationBuilder.AlterColumn<int>(
                 name: "ArtistOrder",
                 table: "TrackArtists",
@@ -2403,6 +2414,7 @@ namespace PetalAPI.Migrations
                 oldType: "INTEGER")
                 .Annotation("Sqlite:Autoincrement", true)
                 .OldAnnotation("Sqlite:Autoincrement", true);
+            } // end SQLite-only guard
 
             migrationBuilder.AddColumn<int>(
                 name: "Popularity",
@@ -2410,6 +2422,8 @@ namespace PetalAPI.Migrations
                 type: "integer",
                 nullable: true);
 
+            if (migrationBuilder.ActiveProvider == "Microsoft.EntityFrameworkCore.Sqlite")
+            {
             migrationBuilder.AlterColumn<int>(
                 name: "TrackId",
                 table: "AlbumTracks",
@@ -2504,6 +2518,7 @@ namespace PetalAPI.Migrations
                 oldType: "INTEGER")
                 .Annotation("Sqlite:Autoincrement", true)
                 .OldAnnotation("Sqlite:Autoincrement", true);
+            } // end SQLite-only guard
         }
     }
 }
