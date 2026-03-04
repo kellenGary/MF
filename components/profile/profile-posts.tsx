@@ -8,6 +8,7 @@ import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Dimensions,
   Pressable,
   StyleSheet,
   View,
@@ -83,16 +84,19 @@ export default function ProfilePosts({ userId, isOwnProfile }: ProfilePostsProps
     setActiveFilter(filter);
   }, []);
 
+  // Use screen height as minimum so content never collapses when switching tabs
+  const minContentHeight = Dimensions.get("window").height * 0.5;
+
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { minHeight: minContentHeight }]}>
         <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { minHeight: minContentHeight }]}>
       {/* Filter Chips */}
       <PostFilterChips
         activeFilter={activeFilter}
