@@ -191,8 +191,19 @@ public class ProfileController : ControllerBase
         }
 
         // 2. Refresh from Spotify (Only if Self)
-        // Only auto-refresh if it's the current user viewing their own profile
-        var accessToken = await _spotifyTokenService.GetValidAccessTokenAsync(targetUserId, autoRefresh: isSelf);
+        // Only auto-refresh if it's the current user viewing their own profile.
+        // For other users, pass autoRefresh:false so we only get a token if it is
+        // still considered valid — an invalid/expired token for a seed user should
+        // never cause a call to Spotify that then returns a 401 to the client.
+        string? accessToken = null;
+        try
+        {
+            accessToken = await _spotifyTokenService.GetValidAccessTokenAsync(targetUserId, autoRefresh: isSelf);
+        }
+        catch (Exception tokenEx)
+        {
+            _logger.LogWarning(tokenEx, "Could not retrieve Spotify token for user {UserId}, will use cache or empty result", targetUserId);
+        }
         
         if (string.IsNullOrEmpty(accessToken))
         {
@@ -219,11 +230,20 @@ public class ProfileController : ControllerBase
             var error = await response.Content.ReadAsStringAsync();
             _logger.LogError("Spotify API error fetching top artists: {Error}", error);
             
-            // Fallback to cache if available
-             if (!string.IsNullOrEmpty(targetUser.TopArtistsJson))
+            // Fallback to stale cache if available.
+            if (!string.IsNullOrEmpty(targetUser.TopArtistsJson))
             {
                 var cachedStats = JsonSerializer.Deserialize<JsonElement>(targetUser.TopArtistsJson);
                 return Ok(new { topItems = cachedStats });
+            }
+
+            // Never propagate Spotify's 401 back to the client — the client would
+            // interpret that as the *current* user's session being invalid and sign
+            // them out.  Return an empty result instead.
+            if (!isSelf)
+            {
+                _logger.LogWarning("Spotify token invalid for user {UserId} (not self). Returning empty top-artists.", targetUserId);
+                return Ok(new { topItems = new { items = new object[] { } } });
             }
 
             return StatusCode((int)response.StatusCode, new 

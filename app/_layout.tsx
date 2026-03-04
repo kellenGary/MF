@@ -94,6 +94,11 @@ function RootLayoutNav() {
           sheetAllowedDetents: [1.0],
           sheetGrabberVisible: true,
           contentStyle: { backgroundColor: colors.background },
+          headerShown: true,
+          headerTitle: "Notifications",
+          headerStyle: { backgroundColor: colors.background },
+          headerTintColor: colors.text,
+          headerShadowVisible: false,
         }}
       />
       <Stack.Screen

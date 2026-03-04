@@ -197,10 +197,11 @@ public class UserDataController : ControllerBase
 
     /// <summary>
     /// Retrieves a specific album with its tracks. If not cached, fetches from Spotify and stores in AlbumTracks.
+    /// Accepts either a database integer ID or a Spotify album ID string.
     /// </summary>
-    /// <param name="spotifyAlbumId">The Spotify ID of the album.</param>
-    [HttpGet("album/{spotifyAlbumId}")]
-    public async Task<IActionResult> GetAlbumWithTracks(string spotifyAlbumId)
+    /// <param name="albumId">The database ID (integer) or Spotify ID of the album.</param>
+    [HttpGet("album/{albumId}")]
+    public async Task<IActionResult> GetAlbumWithTracks(string albumId)
     {
         var userId = GetCurrentUserId();
         if (userId == null)
@@ -210,9 +211,24 @@ public class UserDataController : ControllerBase
 
         try
         {
-            // Find the album by Spotify ID
-            var album = await _context.Albums
-                .FirstOrDefaultAsync(a => a.SpotifyId == spotifyAlbumId);
+            // Resolve album: support both numeric DB id and Spotify string id
+            var album = int.TryParse(albumId, out var dbId)
+                ? await _context.Albums.FirstOrDefaultAsync(a => a.Id == dbId)
+                : await _context.Albums.FirstOrDefaultAsync(a => a.SpotifyId == albumId);
+
+            // Bail out early if we can't resolve the album to a valid Spotify ID
+            var spotifyAlbumId = album?.SpotifyId;
+            if (string.IsNullOrWhiteSpace(spotifyAlbumId))
+            {
+                // If a numeric DB id was given but album wasn't found, that's a 404
+                // If a Spotify-style string was given but album wasn't found, we can try Spotify directly
+                if (int.TryParse(albumId, out _) || album != null)
+                {
+                    return NotFound(new { error = "Album not found" });
+                }
+                // Fall back to using the raw string as a Spotify ID
+                spotifyAlbumId = albumId;
+            }
 
             // Double, redundant check for cached tracks to avoid lock if possible
             var hasCachedTracks = album != null && await _context.AlbumTracks
@@ -229,21 +245,34 @@ public class UserDataController : ControllerBase
                 try 
                 {
                     // Re-check album existence inside lock
-                    album = await _context.Albums
-                        .FirstOrDefaultAsync(a => a.SpotifyId == spotifyAlbumId);
-                        
+                    album = int.TryParse(albumId, out var dbId2)
+                        ? await _context.Albums.FirstOrDefaultAsync(a => a.Id == dbId2)
+                        : await _context.Albums.FirstOrDefaultAsync(a => a.SpotifyId == albumId);
+
+                    if (!string.IsNullOrWhiteSpace(album?.SpotifyId))
+                        spotifyAlbumId = album.SpotifyId;
+
                     // Re-check cached tracks inside lock
                     hasCachedTracks = album != null && await _context.AlbumTracks
                         .AnyAsync(at => at.AlbumId == album.Id);
 
                     if (!hasCachedTracks)
                     {
-                        // Fetch from Spotify and cache
-                        await FetchAndCacheAlbumTracksFromSpotifyAsync(spotifyAlbumId, userId.Value);
-                        
-                        // Re-fetch the album after caching
-                        album = await _context.Albums
-                            .FirstOrDefaultAsync(a => a.SpotifyId == spotifyAlbumId);
+                        // Guard: only call Spotify with a real Spotify ID (not a numeric DB id)
+                        if (int.TryParse(spotifyAlbumId, out _))
+                        {
+                            _logger.LogError("Cannot fetch from Spotify: resolved ID '{SpotifyId}' is numeric, not a valid Spotify ID", spotifyAlbumId);
+                        }
+                        else
+                        {
+                            // Fetch from Spotify and cache
+                            await FetchAndCacheAlbumTracksFromSpotifyAsync(spotifyAlbumId, userId.Value);
+                            
+                            // Re-fetch the album after caching
+                            album = int.TryParse(albumId, out var dbId3)
+                                ? await _context.Albums.FirstOrDefaultAsync(a => a.Id == dbId3)
+                                : await _context.Albums.FirstOrDefaultAsync(a => a.SpotifyId == albumId);
+                        }
                     }
                 }
                 finally
@@ -307,7 +336,7 @@ public class UserDataController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error fetching album {AlbumId}", spotifyAlbumId);
+            _logger.LogError(ex, "Error fetching album {AlbumId}", albumId);
             return StatusCode(500, new { error = "Internal server error" });
         }
     }

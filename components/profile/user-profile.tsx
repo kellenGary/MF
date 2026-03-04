@@ -7,6 +7,7 @@ import profileApi, { CompatibilityResult, ProfileData } from "@/services/profile
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   NativeScrollEvent,
   NativeSyntheticEvent,
   RefreshControl,
@@ -19,10 +20,9 @@ import CompatibilityScore from "./compatibility-score";
 import ProfileContent from "./profile-content";
 import ProfileHeader from "./profile-header";
 import ProfileStats from "./profile-stats";
+import { ThemedText } from "@/components/ui/themed-text";
 
 const PAGE_SIZE = 50;
-
-export type TabType = "history" | "playlists" | "liked";
 
 export interface AlbumGroup {
   type: "album-group";
@@ -50,13 +50,12 @@ interface UserProfileProps {
  */
 export default function UserProfile({ userId }: UserProfileProps) {
   const insets = useSafeAreaInsets();
-  const { isAuthenticated, profileData: cachedProfileData } = useAuth();
+  const { isAuthenticated, profileData: cachedProfileData, user, refreshCurrentUser } = useAuth();
   const { collapse } = useScrollContext();
   const { colors } = useTheme();
 
   // Profile-specific state
   const [profileData, setProfileData] = useState<ProfileData | null>(userId ? null : cachedProfileData);
-  const [activeTab, setActiveTab] = useState<TabType>("history");
   const [refreshing, setRefreshing] = useState(false);
   const [followCounts, setFollowCounts] = useState({
     followers: 0,
@@ -158,75 +157,12 @@ export default function UserProfile({ userId }: UserProfileProps) {
     return grouped;
   };
 
-  // === Event Handlers ===
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    const doRefresh = async () => {
-      switch (activeTab) {
-        case "history":
-          await fetchRecentTracks(PAGE_SIZE, 0, true);
-          break;
-        case "playlists":
-          await fetchPlaylists(true);
-          break;
-        case "liked":
-          await fetchLikedTracks(PAGE_SIZE, 0, true);
-          break;
-      }
-      setRefreshing(false);
-    };
-    doRefresh();
-  }, [activeTab, fetchRecentTracks, fetchPlaylists, fetchLikedTracks]);
-
-  const loadMore = useCallback(() => {
-    switch (activeTab) {
-      case "history":
-        if (!contentLoading.tracks && pagination.recentTracks.hasMore) {
-          fetchRecentTracks(PAGE_SIZE, recentTracks.length, false);
-        }
-        break;
-      case "liked":
-        if (!contentLoading.tracks && pagination.likedTracks.hasMore) {
-          fetchLikedTracks(PAGE_SIZE, likedTracks.length, false);
-        }
-        break;
-    }
-  }, [
-    activeTab,
-    contentLoading.tracks,
-    pagination.recentTracks.hasMore,
-    pagination.likedTracks.hasMore,
-    recentTracks.length,
-    likedTracks.length,
-    fetchRecentTracks,
-    fetchLikedTracks,
-  ]);
-
-  const handleScroll = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const { layoutMeasurement, contentOffset, contentSize } =
-        event.nativeEvent;
-      const paddingToBottom = 200;
-      const isCloseToBottom =
-        layoutMeasurement.height + contentOffset.y >=
-        contentSize.height - paddingToBottom;
-
-      if (isCloseToBottom) {
-        loadMore();
-      }
-    },
-    [loadMore],
-  );
-
   const handleFollowChange = useCallback((isFollowing: boolean) => {
     setFollowCounts((prev) => ({
       ...prev,
       followers: isFollowing ? prev.followers + 1 : prev.followers - 1,
     }));
   }, []);
-
-  // === Effects ===
 
   // Fetch profile data when screen is focused
   useFocusEffect(
@@ -269,31 +205,60 @@ export default function UserProfile({ userId }: UserProfileProps) {
   // Reset data when userId changes
   useEffect(() => {
     setProfileData(userId ? null : cachedProfileData);
-    setActiveTab("history");
     setFollowCounts({ followers: 0, following: 0 });
     resetPagination();
   }, [userId, resetPagination, cachedProfileData]);
 
-  // Load data on tab change if not already loaded
-  useEffect(() => {
-    switch (activeTab) {
-      case "history":
-        if (!recentTracks || recentTracks.length === 0) {
-          fetchRecentTracks(PAGE_SIZE, 0, true).catch(() => { });
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      if (userId && !isAuthenticated) return;
+
+      // Re-check sync status if looking at own profile
+      if (isOwnProfile) {
+        await refreshCurrentUser();
+      }
+
+      const fetchProfileData = async () => {
+        if (!isAuthenticated) return;
+        try {
+          const data = await profileApi.getAppProfile(userId);
+          setProfileData(data);
+          setFollowCounts({
+            followers: data.totalFollowers,
+            following: data.totalFollowing,
+          });
+        } catch (error) {
+          console.error("Failed to fetch profile:", error);
         }
-        break;
-      case "playlists":
-        if (!playlists || playlists.length === 0) {
-          fetchPlaylists(true).catch(() => { });
-        }
-        break;
-      case "liked":
-        if (!likedTracks || likedTracks.length === 0) {
-          fetchLikedTracks(PAGE_SIZE, 0, true).catch(() => { });
-        }
-        break;
+      };
+
+      await Promise.all([
+        fetchProfileData(),
+        fetchRecentTracks(PAGE_SIZE, 0, true),
+        fetchLikedTracks(PAGE_SIZE, 0, true),
+        fetchLikedAlbums(PAGE_SIZE, 0, true),
+        fetchPlaylists(true),
+        fetchFollowedArtists(PAGE_SIZE, 0, true),
+        fetchTopArtists(true),
+        fetchSotd()
+      ]);
+    } finally {
+      setRefreshing(false);
     }
-  }, [activeTab, isAuthenticated]);
+  }, [
+    userId,
+    isAuthenticated,
+    isOwnProfile,
+    refreshCurrentUser,
+    fetchRecentTracks,
+    fetchLikedTracks,
+    fetchLikedAlbums,
+    fetchPlaylists,
+    fetchFollowedArtists,
+    fetchTopArtists,
+    fetchSotd
+  ]);
 
   return (
     <View
@@ -303,18 +268,28 @@ export default function UserProfile({ userId }: UserProfileProps) {
         { backgroundColor: colors.background },
       ]}
     >
+      {isOwnProfile && user && !user.isInitialSyncComplete ? (
+        <View style={styles.syncingContainer}>
+          <ActivityIndicator size="large" color={colors.mutedForeground} />
+          <ThemedText type="defaultSemiBold" style={styles.syncingTitle}>
+            Syncing your Spotify data
+          </ThemedText>
+          <ThemedText type="small" style={[styles.syncingSubtitle, { color: colors.mutedForeground }]}>
+            We're importing your music library. Come back soon — your profile will be ready shortly.
+          </ThemedText>
+        </View>
+      ) : (
       <ScrollView
         ref={scrollViewRef}
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         bounces={true}
-        onScroll={handleScroll}
         scrollEventThrottle={400}
         onScrollBeginDrag={collapse}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={onRefresh}
+            onRefresh={handleRefresh}
             tintColor={colors.text}
             colors={["#538ce9ff"]}
           />
@@ -356,8 +331,24 @@ export default function UserProfile({ userId }: UserProfileProps) {
           followedArtists={followedArtists}
           isOwnProfile={isOwnProfile}
           spotifyId={profileData?.spotifyId}
+          onLoadMoreLikedTracks={() => {
+            if (pagination.likedTracks.hasMore && !contentLoading.tracks) {
+              fetchLikedTracks(PAGE_SIZE, likedTracks.length);
+            }
+          }}
+          onLoadMoreLikedAlbums={() => {
+            if (pagination.likedAlbums.hasMore && !contentLoading.albums) {
+              fetchLikedAlbums(PAGE_SIZE, likedAlbums.length);
+            }
+          }}
+          onLoadMoreFollowedArtists={() => {
+            if (pagination.followedArtists.hasMore && !contentLoading.artists) {
+              fetchFollowedArtists(PAGE_SIZE, followedArtists.length);
+            }
+          }}
         />
       </ScrollView>
+      )}
     </View>
   );
 }
@@ -373,5 +364,21 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     alignItems: "center",
     gap: 8,
+  },
+  syncingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 40,
+    gap: 16,
+  },
+  syncingTitle: {
+    fontSize: 18,
+    textAlign: "center",
+    marginTop: 8,
+  },
+  syncingSubtitle: {
+    textAlign: "center",
+    lineHeight: 22,
   },
 });

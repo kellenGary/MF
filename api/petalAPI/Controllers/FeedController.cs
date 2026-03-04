@@ -110,6 +110,7 @@ public class FeedController : ControllerBase
                     Name = p.Track.Name,
                     ArtistNames = p.Track.TrackArtists.Select(ta => ta.Artist.Name).ToList(),
                     AlbumName = p.Track.Album != null ? p.Track.Album.Name : null,
+                    AlbumId = p.Track.Album != null ? p.Track.Album.Id : (int?)null,
                     AlbumImageUrl = p.Track.Album != null ? p.Track.Album.ImageUrl : null,
                     DurationMs = p.Track.DurationMs
                 } : null,
@@ -242,6 +243,7 @@ public class FeedController : ControllerBase
                     Name = p.Track.Name,
                     ArtistNames = p.Track.TrackArtists.Select(ta => ta.Artist.Name).ToList(),
                     AlbumName = p.Track.Album != null ? p.Track.Album.Name : null,
+                    AlbumId = p.Track.Album != null ? p.Track.Album.Id : (int?)null,
                     AlbumImageUrl = p.Track.Album != null ? p.Track.Album.ImageUrl : null,
                     DurationMs = p.Track.DurationMs
                 } : null,
@@ -337,6 +339,7 @@ public class FeedTrackDto
     public string Name { get; set; } = string.Empty;
     public List<string> ArtistNames { get; set; } = new();
     public string? AlbumName { get; set; }
+    public int? AlbumId { get; set; }
     public string? AlbumImageUrl { get; set; }
     public int DurationMs { get; set; }
 }

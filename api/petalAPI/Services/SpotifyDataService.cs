@@ -131,7 +131,15 @@ public class SpotifyDataService : ISpotifyDataService
                 }
                 else 
                 {
-                    // Create new
+                    // Create new — re-check just before insert to close the race window
+                    // (the Spotify HTTP call above takes time, another thread may have inserted meanwhile)
+                    var preInsertCheck = await _context.Artists.FirstOrDefaultAsync(a => a.SpotifyId == spotifyId);
+                    if (preInsertCheck != null)
+                    {
+                        _logger.LogDebug("[SpotifyData] Artist {Name} inserted by concurrent request, returning existing", preInsertCheck.Name);
+                        return preInsertCheck;
+                    }
+
                     var artist = new Artist
                     {
                         SpotifyId = spotifyId,
@@ -149,7 +157,7 @@ public class SpotifyDataService : ISpotifyDataService
                     }
                     catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("UNIQUE constraint failed") == true)
                     {
-                        // Race condition: another request inserted it
+                        // Race condition: another request inserted it between our check and insert
                         _context.Entry(artist).State = EntityState.Detached;
                         return await _context.Artists.FirstOrDefaultAsync(a => a.SpotifyId == spotifyId);
                     }
@@ -162,7 +170,10 @@ public class SpotifyDataService : ISpotifyDataService
                 // If checking for update, just return existing
                 if (existingArtist != null) return existingArtist;
 
-                // Fallback: create with minimal info
+                // Fallback: create with minimal info — re-check before insert
+                var fallbackCheck = await _context.Artists.FirstOrDefaultAsync(a => a.SpotifyId == spotifyId);
+                if (fallbackCheck != null) return fallbackCheck;
+
                 var artist = new Artist
                 {
                     SpotifyId = spotifyId,

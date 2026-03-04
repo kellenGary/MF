@@ -13,6 +13,7 @@ export interface FeedTrack {
   name: string;
   artistNames: string[];
   albumName: string | null;
+  albumId: number | null;
   albumImageUrl: string | null;
   durationMs: number;
 }

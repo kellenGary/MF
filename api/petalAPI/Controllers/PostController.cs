@@ -16,12 +16,21 @@ public class PostController : ControllerBase
     private readonly AppDbContext _context;
     private readonly IPostService _postService;
     private readonly ILogger<PostController> _logger;
+    private readonly ISpotifyTokenService _spotifyTokenService;
+    private readonly ISavedTracksSyncService _savedTracksSyncService;
 
-    public PostController(AppDbContext context, IPostService postService, ILogger<PostController> logger)
+    public PostController(
+        AppDbContext context,
+        IPostService postService,
+        ILogger<PostController> logger,
+        ISpotifyTokenService spotifyTokenService,
+        ISavedTracksSyncService savedTracksSyncService)
     {
         _context = context;
         _postService = postService;
         _logger = logger;
+        _spotifyTokenService = spotifyTokenService;
+        _savedTracksSyncService = savedTracksSyncService;
     }
 
     private int? GetCurrentUserId()
@@ -53,6 +62,20 @@ public class PostController : ControllerBase
         else if (!string.IsNullOrEmpty(request.SpotifyId))
         {
             track = await _context.Tracks.FirstOrDefaultAsync(t => t.SpotifyId == request.SpotifyId);
+        }
+
+        // Track not in DB yet — fetch from Spotify and create it (with album + artists)
+        if (track == null && !string.IsNullOrEmpty(request.SpotifyId))
+        {
+            _logger.LogInformation(
+                "[PostController] Track {SpotifyId} not found in DB, fetching from Spotify for user {UserId}",
+                request.SpotifyId, userId);
+
+            var accessToken = await _spotifyTokenService.GetValidAccessTokenAsync(userId.Value);
+            if (accessToken != null)
+            {
+                track = await _savedTracksSyncService.GetOrCreateTrackBySpotifyIdAsync(request.SpotifyId, accessToken);
+            }
         }
 
         if (track == null)
@@ -218,73 +241,7 @@ public class PostController : ControllerBase
         return Ok(new { message = "Post deleted successfully" });
     }
 
-    /// <summary>
-    /// Like a post
-    /// </summary>
-    [HttpPost("{postId}/like")]
-    public async Task<IActionResult> LikePost(int postId)
-    {
-        var userId = GetCurrentUserId();
-        if (userId == null) return Unauthorized(new { error = "Invalid token" });
 
-        var success = await _postService.LikePost(userId.Value, postId);
-        if (!success) return NotFound(new { error = "Post not found" });
-
-        // Calculate new like count (hacky but simple for now, or just return success)
-        var likeCount = await _context.PostLikes.CountAsync(l => l.PostId == postId);
-
-        return Ok(new { isLiked = true, likeCount });
-    }
-
-    /// <summary>
-    /// Unlike a post
-    /// </summary>
-    [HttpDelete("{postId}/like")]
-    public async Task<IActionResult> UnlikePost(int postId)
-    {
-        var userId = GetCurrentUserId();
-        if (userId == null) return Unauthorized(new { error = "Invalid token" });
-
-        var success = await _postService.UnlikePost(userId.Value, postId);
-        // Even if false (post not found), we can return success or not found.
-        
-        var likeCount = await _context.PostLikes.CountAsync(l => l.PostId == postId);
-
-        return Ok(new { isLiked = false, likeCount });
-    }
-
-    /// <summary>
-    /// Repost a post
-    /// </summary>
-    [HttpPost("{postId}/repost")]
-    public async Task<IActionResult> RepostPost(int postId)
-    {
-        var userId = GetCurrentUserId();
-        if (userId == null) return Unauthorized(new { error = "Invalid token" });
-
-        var repost = await _postService.RepostPost(userId.Value, postId);
-        if (repost == null) return NotFound(new { error = "Post not found" });
-
-        var repostCount = await _context.Posts.CountAsync(p => p.OriginalPostId == postId && p.Type == PostType.Repost && p.DeletedAt == null);
-
-        return Ok(new { isReposted = true, repostCount, repostPostId = repost.Id });
-    }
-
-    /// <summary>
-    /// Remove a repost
-    /// </summary>
-    [HttpDelete("{postId}/repost")]
-    public async Task<IActionResult> RemoveRepost(int postId)
-    {
-        var userId = GetCurrentUserId();
-        if (userId == null) return Unauthorized(new { error = "Invalid token" });
-
-        var success = await _postService.RemoveRepost(userId.Value, postId);
-        
-        var repostCount = await _context.Posts.CountAsync(p => p.OriginalPostId == postId && p.Type == PostType.Repost && p.DeletedAt == null);
-
-        return Ok(new { isReposted = false, repostCount });
-    }
 
     /// <summary>
     /// Seeds dummy posts for testing (Developer Only).

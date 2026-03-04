@@ -5,7 +5,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { FeedTrack } from "@/services/feedApi";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, View } from "react-native";
 
 interface ProfileContentProps {
     loading: boolean;
@@ -17,6 +17,9 @@ interface ProfileContentProps {
     followedArtists: any[];
     isOwnProfile: boolean;
     spotifyId?: string;
+    onLoadMoreLikedTracks?: () => void;
+    onLoadMoreLikedAlbums?: () => void;
+    onLoadMoreFollowedArtists?: () => void;
 }
 
 export default function ProfileContent({
@@ -29,6 +32,9 @@ export default function ProfileContent({
     followedArtists,
     isOwnProfile,
     spotifyId,
+    onLoadMoreLikedTracks,
+    onLoadMoreLikedAlbums,
+    onLoadMoreFollowedArtists,
 }: ProfileContentProps) {
     const { colors } = useTheme();
 
@@ -70,7 +76,7 @@ export default function ProfileContent({
                         </ThemedText>
                     </View>
                     <View style={{ paddingHorizontal: 16 }}>
-                        <TrackCarousel tracks={likedTracks} />
+                        <TrackCarousel tracks={likedTracks} onEndReached={onLoadMoreLikedTracks} />
                     </View>
                 </View>
             )}
@@ -86,16 +92,18 @@ export default function ProfileContent({
                             {likedAlbums.length} albums
                         </ThemedText>
                     </View>
-                    <ScrollView
+                    <FlatList
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.horizontalScrollContent}
-                    >
-                        {likedAlbums.map((item: any, index: number) => {
+                        data={likedAlbums}
+                        keyExtractor={(item, index) => `album-${item.album?.id || item.id}-${index}`}
+                        onEndReached={onLoadMoreLikedAlbums}
+                        onEndReachedThreshold={0.5}
+                        renderItem={({ item }) => {
                             const album = item.album || item;
                             return (
                                 <Pressable
-                                    key={`album-${album.id}-${index}`}
                                     style={styles.mediaCard}
                                     onPress={() => router.push(`/album/${album.id}`)}
                                 >
@@ -117,8 +125,8 @@ export default function ProfileContent({
                                     </ThemedText>
                                 </Pressable>
                             );
-                        })}
-                    </ScrollView>
+                        }}
+                    />
                 </View>
             )}
 
@@ -133,14 +141,14 @@ export default function ProfileContent({
                             {filteredPlaylists.length} playlists
                         </ThemedText>
                     </View>
-                    <ScrollView
+                    <FlatList
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.horizontalScrollContent}
-                    >
-                        {filteredPlaylists.map((playlist: any, index: number) => (
+                        data={filteredPlaylists}
+                        keyExtractor={(playlist, index) => `playlist-${playlist.id}-${index}`}
+                        renderItem={({ item: playlist }) => (
                             <Pressable
-                                key={`playlist-${playlist.id}-${index}`}
                                 style={styles.mediaCard}
                                 onPress={() => router.push(`/playlist/${playlist.id}`)}
                             >
@@ -161,8 +169,8 @@ export default function ProfileContent({
                                     {playlist.tracks?.total || 0} songs
                                 </ThemedText>
                             </Pressable>
-                        ))}
-                    </ScrollView>
+                        )}
+                    />
                 </View>
             )}
 
@@ -189,16 +197,18 @@ export default function ProfileContent({
                             </Pressable>
                         )}
                     </View>
-                    <ScrollView
+                    <FlatList
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.horizontalScrollContent}
-                    >
-                        {followedArtists.slice(0, 10).map((item: any, index: number) => {
+                        data={followedArtists}
+                        keyExtractor={(item, index) => `artist-${item.artist?.id || item.id}-${index}`}
+                        onEndReached={onLoadMoreFollowedArtists}
+                        onEndReachedThreshold={0.5}
+                        renderItem={({ item }) => {
                             const artist = item.artist || item;
                             return (
                                 <Pressable
-                                    key={`artist-${artist.id}-${index}`}
                                     style={styles.artistCard}
                                     onPress={() => router.push(`/artist/${artist.id}`)}
                                 >
@@ -220,8 +230,8 @@ export default function ProfileContent({
                                     </ThemedText>
                                 </Pressable>
                             );
-                        })}
-                    </ScrollView>
+                        }}
+                    />
                 </View>
             )}
 

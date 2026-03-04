@@ -95,12 +95,15 @@ public class PetalShuffleController : ControllerBase
 
         // 3. Fetch tracks for the context
         var tracks = new List<string>();
-        string contextType = contextUri.Split(':')[1];
-        string contextId = contextUri.Split(':')[2];
+        var contextParts = contextUri.Split(':');
+        // Handle both "spotify:collection" and "spotify:user:{id}:collection"
+        bool isCollection = contextParts[contextParts.Length - 1] == "collection";
+        string contextType = isCollection ? "collection" : (contextParts.Length > 1 ? contextParts[1] : "");
+        string contextId   = contextParts.Length > 2 ? contextParts[2] : "";
         
         try
         {
-            if (contextType == "playlist")
+            if (contextType == "playlist" && !string.IsNullOrEmpty(contextId))
             {
                 // Fetch up to 100 tracks from the playlist
                 var plResponse = await client.GetAsync($"https://api.spotify.com/v1/playlists/{contextId}/tracks?limit=100");
@@ -112,7 +115,8 @@ public class PetalShuffleController : ControllerBase
                     {
                         foreach (var item in itemsElement.EnumerateArray())
                         {
-                            if (item.TryGetProperty("track", out var trackEl) && trackEl.TryGetProperty("uri", out var uEl))
+                            if (item.TryGetProperty("track", out var trackEl) && trackEl.ValueKind != JsonValueKind.Null
+                                && trackEl.TryGetProperty("uri", out var uEl))
                             {
                                 var trackUri = uEl.GetString();
                                 if (!string.IsNullOrEmpty(trackUri)) tracks.Add(trackUri);
@@ -121,7 +125,7 @@ public class PetalShuffleController : ControllerBase
                     }
                 }
             }
-            else if (contextType == "album")
+            else if (contextType == "album" && !string.IsNullOrEmpty(contextId))
             {
                 var alResponse = await client.GetAsync($"https://api.spotify.com/v1/albums/{contextId}/tracks?limit=50");
                 if (alResponse.IsSuccessStatusCode)
@@ -141,6 +145,53 @@ public class PetalShuffleController : ControllerBase
                     }
                 }
             }
+            else if (contextType == "artist" && !string.IsNullOrEmpty(contextId))
+            {
+                // Fetch top tracks for the artist (market = from token)
+                var atResponse = await client.GetAsync($"https://api.spotify.com/v1/artists/{contextId}/top-tracks");
+                if (atResponse.IsSuccessStatusCode)
+                {
+                    var atContent = await atResponse.Content.ReadAsStringAsync();
+                    var atJson = JsonSerializer.Deserialize<JsonElement>(atContent);
+                    if (atJson.TryGetProperty("tracks", out var tracksElement) && tracksElement.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var item in tracksElement.EnumerateArray())
+                        {
+                            if (item.TryGetProperty("uri", out var uEl))
+                            {
+                                var trackUri = uEl.GetString();
+                                if (!string.IsNullOrEmpty(trackUri)) tracks.Add(trackUri);
+                            }
+                        }
+                    }
+                }
+            }
+            else if (contextType == "collection")
+            {
+                // Liked Songs — fetch up to 50 saved tracks
+                var stResponse = await client.GetAsync("https://api.spotify.com/v1/me/tracks?limit=50");
+                if (stResponse.IsSuccessStatusCode)
+                {
+                    var stContent = await stResponse.Content.ReadAsStringAsync();
+                    var stJson = JsonSerializer.Deserialize<JsonElement>(stContent);
+                    if (stJson.TryGetProperty("items", out var itemsElement) && itemsElement.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var item in itemsElement.EnumerateArray())
+                        {
+                            if (item.TryGetProperty("track", out var trackEl) && trackEl.ValueKind != JsonValueKind.Null
+                                && trackEl.TryGetProperty("uri", out var uEl))
+                            {
+                                var trackUri = uEl.GetString();
+                                if (!string.IsNullOrEmpty(trackUri)) tracks.Add(trackUri);
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                _logger.LogWarning("Unsupported context type '{ContextType}' for Petal Shuffle (uri: {ContextUri})", contextType, contextUri);
+            }
         }
         catch (Exception ex)
         {
@@ -149,7 +200,7 @@ public class PetalShuffleController : ControllerBase
 
         if (tracks.Count == 0)
         {
-            return BadRequest(new { error = "Could not retrieve tracks for shuffling." });
+            return BadRequest(new { error = $"Could not retrieve tracks for shuffling (context: {contextType})." });
         }
 
         // 4. Shuffle tracks (excluding current track if we have it)

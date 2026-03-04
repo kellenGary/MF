@@ -4,8 +4,8 @@ import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import notificationApi, { Notification } from '@/services/notificationApi';
 import { Ionicons } from '@expo/vector-icons';
-import { router, Stack } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigation } from "expo-router";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -56,13 +56,13 @@ export default function NotificationsScreen() {
   }, [fetchNotifications]);
 
   const handleLoadMore = useCallback(() => {
-    if (!initialLoadDoneRef.current || isFetchingRef.current || !hasMoreRef.current || loadingMore) return;
+    if (!initialLoadDoneRef.current || isFetchingRef.current || !hasMoreRef.current) return;
     setLoadingMore(true);
 
     fetchNotifications(false).finally(() => {
       setLoadingMore(false);
     });
-  }, [fetchNotifications, loadingMore]);
+  }, [fetchNotifications]);
 
   const handleMarkAllRead = useCallback(async () => {
     try {
@@ -129,32 +129,27 @@ export default function NotificationsScreen() {
     );
   };
 
+  const navigation = useNavigation();
   const unreadCount = notifications.filter(n => !n.isRead).length;
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable
+          onPress={handleMarkAllRead}
+          style={[styles.markReadButton, { opacity: unreadCount > 0 ? 1 : 0 }]}
+          disabled={unreadCount === 0}
+        >
+          <ThemedText style={[styles.markReadText, { color: Colors.primary }]}>
+            Mark all read
+          </ThemedText>
+        </Pressable>
+      ),
+    });
+  }, [navigation, unreadCount, handleMarkAllRead, colors]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          headerTitle: "Notifications",
-          headerLeft: () => (
-            <Pressable onPress={() => router.back()} style={styles.backButton}>
-              <Ionicons name="chevron-back" size={24} color={colors.text} />
-            </Pressable>
-          ),
-          headerRight: () => unreadCount > 0 ? (
-            <Pressable onPress={handleMarkAllRead} style={styles.markReadButton}>
-              <ThemedText style={[styles.markReadText, { color: Colors.primary }]}>
-                Mark all read
-              </ThemedText>
-            </Pressable>
-          ) : null,
-          headerStyle: { backgroundColor: colors.background },
-          headerTintColor: colors.text,
-          headerShadowVisible: false,
-        }}
-      />
-
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.text} />

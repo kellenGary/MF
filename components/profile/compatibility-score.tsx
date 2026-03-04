@@ -68,13 +68,13 @@ export default function CompatibilityScore({
                 ]}
             >
                 <View style={styles.insufficientContainer}>
-                    <MaterialIcons name="music-note" size={28} color={colors.textSecondary} />
+                    <MaterialIcons name="music-note" size={28} color={colors.text} />
                     <ThemedText type="defaultSemiBold" style={styles.insufficientTitle}>
                         Music Compatibility
                     </ThemedText>
                     <ThemedText
                         type="small"
-                        style={[styles.insufficientText, { color: colors.textSecondary }]}
+                        style={[styles.insufficientText, { color: colors.text }]}
                     >
                         Not enough listening data yet to compute a score
                     </ThemedText>
@@ -112,7 +112,7 @@ export default function CompatibilityScore({
             ]}
         >
             {/* Header */}
-            <ThemedText type="small" style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+            <ThemedText type="small" style={[styles.sectionLabel, { color: colors.icon }]}>
                 Music Compatibility
             </ThemedText>
 
@@ -125,7 +125,7 @@ export default function CompatibilityScore({
                             cx={RING_SIZE / 2}
                             cy={RING_SIZE / 2}
                             r={RADIUS}
-                            stroke={colors.border || "rgba(255,255,255,0.1)"}
+                            stroke={colors.icon + "20"}
                             strokeWidth={STROKE_WIDTH}
                             fill="none"
                         />
@@ -155,7 +155,7 @@ export default function CompatibilityScore({
                     <ThemedText type="defaultSemiBold" style={styles.scoreLabel}>
                         {getScoreLabel(compatibility.score)}
                     </ThemedText>
-                    <ThemedText type="small" style={{ color: colors.textSecondary }}>
+                    <ThemedText type="small" style={{ color: colors.icon }}>
                         Based on your listening overlap
                     </ThemedText>
                 </View>
@@ -172,7 +172,7 @@ export default function CompatibilityScore({
                                     <MaterialIcons
                                         name={getFactorIcon(factor.name)}
                                         size={16}
-                                        color={colors.textSecondary}
+                                        color={colors.icon}
                                     />
                                     <ThemedText type="small" style={{ marginLeft: 8 }}>
                                         {factor.label}

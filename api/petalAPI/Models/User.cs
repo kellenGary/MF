@@ -24,6 +24,9 @@ public class User
     
     // Whether the user completed initial profile customization
     public bool HasCompletedProfile { get; set; }
+
+    // Whether the initial Spotify data sync (playlists, saved tracks, albums, artists) has completed
+    public bool IsInitialSyncComplete { get; set; } = true;
     
     // Privacy setting for whether friends can join this user's active listening session
     public bool IsSessionJoinable { get; set; } = true;

@@ -7,6 +7,7 @@ import { ThemedText } from '@/components/ui/themed-text';
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "@/contexts/LocationContext";
+import { usePlayback } from "@/contexts/playbackContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import useUserContent from "@/hooks/useUserContent";
 import { router } from "expo-router";
@@ -103,8 +104,18 @@ export default function HomeScreen() {
     </>
   );
 
+  const { playbackState } = usePlayback();
+  const showMiniPlayer = !!playbackState?.item;
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top, paddingBottom: insets.bottom + 32 }]}>
+    <View style={[
+      styles.container,
+      {
+        backgroundColor: colors.background,
+        paddingTop: insets.top,
+        paddingBottom: showMiniPlayer ? insets.bottom + 32 : 0
+      }
+    ]}>
       <Feed ListHeaderComponent={renderHeader()} />
 
       <SotdSuggestionPopup

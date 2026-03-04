@@ -48,6 +48,7 @@ public class UserService : IUserService
                 Email = email,
                 ProfileImageUrl = profileImageUrl,
                 HasCompletedProfile = false,
+                IsInitialSyncComplete = false,
                 SpotifyAccessToken = accessToken,
                 SpotifyRefreshToken = refreshToken,
                 TokenExpiresAt = DateTime.UtcNow.AddSeconds(expiresIn),
@@ -95,6 +96,16 @@ public class UserService : IUserService
                     {
                         logger.LogInformation("[Service] Starting initial listening history sync for new user {UserId} (Background)", userId);
                         await scopedHistoryService.SyncInitialListeningHistoryAsync(userId, token);
+
+                        // Mark initial sync as complete now that all data is loaded
+                        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        var dbUser = await dbContext.Users.FindAsync(userId);
+                        if (dbUser != null)
+                        {
+                            dbUser.IsInitialSyncComplete = true;
+                            await dbContext.SaveChangesAsync();
+                            logger.LogInformation("[Service] Initial sync complete for new user {UserId}", userId);
+                        }
                     }
                     else
                     {

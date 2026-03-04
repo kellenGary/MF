@@ -10,8 +10,14 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.kelleb.petal",
+      "buildNumber": "1",
       "infoPlist": {
-        "UIBackgroundModes": ["location", "fetch", "audio"]
+        "UIBackgroundModes": [
+          "location",
+          "fetch",
+          "audio"
+        ]
       },
       "config": {
         "googleMapsApiKey": "process.env.GOOGLE_MAPS_API_KEY"
@@ -30,7 +36,14 @@
         "googleMaps": {
           "apiKey": "process.env.GOOGLE_MAPS_API_KEY"
         }
-      }
+      },
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
+      ]
     },
     "web": {
       "output": "static",
@@ -62,6 +75,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "dab921d6-7690-4971-85e1-10f0e15a1b55"
+      }
+    },
+    "owner": "kellengary"
   }
 }

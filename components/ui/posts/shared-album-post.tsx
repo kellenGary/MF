@@ -188,12 +188,10 @@ const styles = StyleSheet.create({
   albumName: {
     fontSize: 16,
     lineHeight: 22,
-    marginBottom: 4,
   },
   caption: {
     fontSize: 14,
     lineHeight: 20,
-    marginBottom: 8,
   },
   trackList: {
     marginTop: 4,
@@ -202,12 +200,10 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "800",
     letterSpacing: 1.5,
-    marginBottom: 6,
   },
   trackRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 3,
   },
   trackNumber: {
     fontSize: 12,
