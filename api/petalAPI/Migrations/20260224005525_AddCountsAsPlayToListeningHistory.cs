@@ -13,7 +13,6 @@ namespace PetalAPI.Migrations
             migrationBuilder.AddColumn<bool>(
                 name: "CountsAsPlay",
                 table: "ListeningHistory",
-                type: "INTEGER",
                 nullable: false,
                 defaultValue: false);
 

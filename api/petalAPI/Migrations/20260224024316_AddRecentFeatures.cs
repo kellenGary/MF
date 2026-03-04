@@ -1,5 +1,6 @@
 ﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
@@ -14,35 +15,33 @@ namespace PetalAPI.Migrations
             migrationBuilder.AddColumn<bool>(
                 name: "IsPetalShuffleActive",
                 table: "Users",
-                type: "INTEGER",
                 nullable: false,
                 defaultValue: false);
 
             migrationBuilder.AddColumn<bool>(
                 name: "IsSessionJoinable",
                 table: "Users",
-                type: "INTEGER",
                 nullable: false,
                 defaultValue: false);
 
             migrationBuilder.AddColumn<string>(
                 name: "OriginalContextUri",
                 table: "Users",
-                type: "TEXT",
                 nullable: true);
 
             migrationBuilder.CreateTable(
                 name: "Comments",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    Text = table.Column<string>(type: "TEXT", maxLength: 1000, nullable: false),
-                    AuthorId = table.Column<int>(type: "INTEGER", nullable: false),
-                    EntityType = table.Column<int>(type: "INTEGER", nullable: false),
-                    EntityId = table.Column<string>(type: "TEXT", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
-                    ParentCommentId = table.Column<int>(type: "INTEGER", nullable: true)
+                    Id = table.Column<int>(nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true)
+                        .Annotation("Npgsql:ValueGenerationStrategy", Npgsql.EntityFrameworkCore.PostgreSQL.Metadata.NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Text = table.Column<string>(maxLength: 1000, nullable: false),
+                    AuthorId = table.Column<int>(nullable: false),
+                    EntityType = table.Column<int>(nullable: false),
+                    EntityId = table.Column<string>(nullable: false),
+                    CreatedAt = table.Column<DateTime>(nullable: false),
+                    ParentCommentId = table.Column<int>(nullable: true)
                 },
                 constraints: table =>
                 {

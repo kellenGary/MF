@@ -13,7 +13,6 @@ namespace PetalAPI.Migrations
             migrationBuilder.AddColumn<bool>(
                 name: "IsInitialSyncComplete",
                 table: "Users",
-                type: "INTEGER",
                 nullable: false,
                 defaultValue: true);
         }
