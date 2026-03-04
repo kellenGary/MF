@@ -20,6 +20,6 @@ COPY --from=build /app/publish .
 # Include SQL view scripts (read at runtime from ContentRootPath)
 COPY api/petalAPI/scripts/ ./scripts/
 
-ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "PetalAPI.dll"]
