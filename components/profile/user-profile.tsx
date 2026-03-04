@@ -70,6 +70,17 @@ export default function UserProfile({ userId }: UserProfileProps) {
   const scrollViewRef = useRef<ScrollView>(null);
   const isOwnProfile = !userId;
   const [activeTab, setActiveTab] = useState<ProfileTab>("activity");
+  const headerHeightRef = useRef(0);
+  const scrollOffsetRef = useRef(0);
+
+  const handleTabChange = useCallback((tab: ProfileTab) => {
+    setActiveTab(tab);
+    // If user has scrolled past the header, snap to the tab bar position
+    // so the view doesn't jump to top
+    if (scrollOffsetRef.current > headerHeightRef.current) {
+      scrollViewRef.current?.scrollTo({ y: headerHeightRef.current, animated: false });
+    }
+  }, []);
 
   // Use the shared content hook for data fetching
   const {
@@ -287,7 +298,8 @@ export default function UserProfile({ userId }: UserProfileProps) {
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         bounces={true}
-        scrollEventThrottle={400}
+        scrollEventThrottle={16}
+        onScroll={(e) => { scrollOffsetRef.current = e.nativeEvent.contentOffset.y; }}
         onScrollBeginDrag={collapse}
         stickyHeaderIndices={[1]}
         refreshControl={
@@ -300,7 +312,10 @@ export default function UserProfile({ userId }: UserProfileProps) {
         }
       >
         {/* Section 0: Header (scrolls away) */}
-        <View style={styles.headerContainer}>
+        <View
+          style={styles.headerContainer}
+          onLayout={(e) => { headerHeightRef.current = e.nativeEvent.layout.height; }}
+        >
           <ProfileHeader
             profileData={profileData}
             isOwnProfile={isOwnProfile}
@@ -327,7 +342,7 @@ export default function UserProfile({ userId }: UserProfileProps) {
         </View>
 
         {/* Section 1: Tab Bar (sticky) */}
-        <ProfileTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+        <ProfileTabBar activeTab={activeTab} onTabChange={handleTabChange} />
 
         {/* Section 2: Tab Content */}
         {activeTab === "activity" ? (
