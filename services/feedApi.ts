@@ -197,6 +197,12 @@ class FeedApiService {
         return `${userName} shared the playlist "${post.playlist?.name}"`;
       case "SharedArtist":
         return `${userName} shared ${post.artist?.name}`;
+      case "Repost":
+        const originalName =
+          post.originalPostUser?.displayName ||
+          post.originalPostUser?.handle ||
+          "someone";
+        return `${userName} reposted ${originalName}'s post`;
       default:
         return `${userName} shared something`;
     }
