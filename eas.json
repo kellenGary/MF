@@ -23,7 +23,7 @@
         "resourceClass": "m-medium"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://your-app.up.railway.app"
+        "EXPO_PUBLIC_API_URL": "https://petal.up.railway.app"
       }
     }
   }

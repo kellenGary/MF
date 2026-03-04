@@ -7,10 +7,10 @@ export const API_URL =
     ? Platform.OS === "ios"
       ? "http://localhost:5164"
       : "http://10.0.2.2:5164"
-    : "https://your-production-api.com");
+    : "https://petal.up.railway.app");
 export const CLIENT_ID = "5f758f2be85d4ae3b816ac89b17e3448";
 export const REDIRECT_URI = "petal://callback";
-export const BACKEND_REDIRECT_URI = "petal://callback"; // Must match REDIRECT_URI for Spotify token exchange
+export const BACKEND_REDIRECT_URI = "petal://callback";
 
 export const SCOPES = [
   "user-read-private",
