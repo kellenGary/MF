@@ -11,13 +11,9 @@ namespace PetalAPI.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "Popularity",
-                table: "Tracks");
-
-            migrationBuilder.DropColumn(
-                name: "Popularity",
-                table: "Artists");
+            // Use CASCADE to also drop any views that depend on the Popularity columns
+            migrationBuilder.Sql(@"ALTER TABLE ""Tracks"" DROP COLUMN IF EXISTS ""Popularity"" CASCADE;");
+            migrationBuilder.Sql(@"ALTER TABLE ""Artists"" DROP COLUMN IF EXISTS ""Popularity"" CASCADE;");
 
             migrationBuilder.AlterColumn<DateTime>(
                 name: "UpdatedAt",
