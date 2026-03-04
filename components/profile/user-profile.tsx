@@ -19,7 +19,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CompatibilityScore from "./compatibility-score";
 import ProfileContent from "./profile-content";
 import ProfileHeader from "./profile-header";
+import ProfilePosts from "./profile-posts";
 import ProfileStats from "./profile-stats";
+import ProfileTabBar, { ProfileTab } from "./profile-tab-bar";
 import { ThemedText } from "@/components/ui/themed-text";
 
 const PAGE_SIZE = 50;
@@ -67,6 +69,18 @@ export default function UserProfile({ userId }: UserProfileProps) {
 
   const scrollViewRef = useRef<ScrollView>(null);
   const isOwnProfile = !userId;
+  const [activeTab, setActiveTab] = useState<ProfileTab>("activity");
+  const headerHeightRef = useRef(0);
+  const scrollOffsetRef = useRef(0);
+
+  const handleTabChange = useCallback((tab: ProfileTab) => {
+    setActiveTab(tab);
+    // If user has scrolled past the header, snap to the tab bar position
+    // so the view doesn't jump to top
+    if (scrollOffsetRef.current > headerHeightRef.current) {
+      scrollViewRef.current?.scrollTo({ y: headerHeightRef.current, animated: false });
+    }
+  }, []);
 
   // Use the shared content hook for data fetching
   const {
@@ -284,8 +298,10 @@ export default function UserProfile({ userId }: UserProfileProps) {
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         bounces={true}
-        scrollEventThrottle={400}
+        scrollEventThrottle={16}
+        onScroll={(e) => { scrollOffsetRef.current = e.nativeEvent.contentOffset.y; }}
         onScrollBeginDrag={collapse}
+        stickyHeaderIndices={[1]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -295,7 +311,11 @@ export default function UserProfile({ userId }: UserProfileProps) {
           />
         }
       >
-        <View style={styles.headerContainer}>
+        {/* Section 0: Header (scrolls away) */}
+        <View
+          style={styles.headerContainer}
+          onLayout={(e) => { headerHeightRef.current = e.nativeEvent.layout.height; }}
+        >
           <ProfileHeader
             profileData={profileData}
             isOwnProfile={isOwnProfile}
@@ -311,42 +331,53 @@ export default function UserProfile({ userId }: UserProfileProps) {
             formatNumber={formatNumber}
             userId={effectiveUserId}
           />
+
+          {/* Compatibility Score — only on other users' profiles */}
+          {!isOwnProfile && (
+            <CompatibilityScore
+              compatibility={compatibility}
+              loading={compatibilityLoading}
+            />
+          )}
         </View>
 
-        {/* Compatibility Score — only on other users' profiles */}
-        {!isOwnProfile && (
-          <CompatibilityScore
-            compatibility={compatibility}
-            loading={compatibilityLoading}
+        {/* Section 1: Tab Bar (sticky) */}
+        <ProfileTabBar activeTab={activeTab} onTabChange={handleTabChange} />
+
+        {/* Section 2: Tab Content */}
+        {activeTab === "activity" ? (
+          <ProfileContent
+            loading={false}
+            contentLoading={contentLoading}
+            recentTracks={recentTracks}
+            likedTracks={likedTracks}
+            likedAlbums={likedAlbums}
+            playlists={playlists}
+            followedArtists={followedArtists}
+            isOwnProfile={isOwnProfile}
+            spotifyId={profileData?.spotifyId}
+            onLoadMoreLikedTracks={() => {
+              if (pagination.likedTracks.hasMore && !contentLoading.tracks) {
+                fetchLikedTracks(PAGE_SIZE, likedTracks.length);
+              }
+            }}
+            onLoadMoreLikedAlbums={() => {
+              if (pagination.likedAlbums.hasMore && !contentLoading.albums) {
+                fetchLikedAlbums(PAGE_SIZE, likedAlbums.length);
+              }
+            }}
+            onLoadMoreFollowedArtists={() => {
+              if (pagination.followedArtists.hasMore && !contentLoading.artists) {
+                fetchFollowedArtists(PAGE_SIZE, followedArtists.length);
+              }
+            }}
+          />
+        ) : (
+          <ProfilePosts
+            userId={effectiveUserId!}
+            isOwnProfile={isOwnProfile}
           />
         )}
-
-        <ProfileContent
-          loading={false}
-          contentLoading={contentLoading}
-          recentTracks={recentTracks}
-          likedTracks={likedTracks}
-          likedAlbums={likedAlbums}
-          playlists={playlists}
-          followedArtists={followedArtists}
-          isOwnProfile={isOwnProfile}
-          spotifyId={profileData?.spotifyId}
-          onLoadMoreLikedTracks={() => {
-            if (pagination.likedTracks.hasMore && !contentLoading.tracks) {
-              fetchLikedTracks(PAGE_SIZE, likedTracks.length);
-            }
-          }}
-          onLoadMoreLikedAlbums={() => {
-            if (pagination.likedAlbums.hasMore && !contentLoading.albums) {
-              fetchLikedAlbums(PAGE_SIZE, likedAlbums.length);
-            }
-          }}
-          onLoadMoreFollowedArtists={() => {
-            if (pagination.followedArtists.hasMore && !contentLoading.artists) {
-              fetchFollowedArtists(PAGE_SIZE, followedArtists.length);
-            }
-          }}
-        />
       </ScrollView>
       )}
     </View>

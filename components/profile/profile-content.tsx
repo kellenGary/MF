@@ -258,6 +258,7 @@ export default function ProfileContent({
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        paddingTop: 16,
     },
     section: {
         marginBottom: 24,
