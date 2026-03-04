@@ -15,13 +15,6 @@ var builder = WebApplication.CreateBuilder(args);
 // Add environment variables to configuration
 builder.Configuration.AddEnvironmentVariables();
 
-// Support Railway's injected PORT env var
-var port = Environment.GetEnvironmentVariable("PORT");
-if (!string.IsNullOrEmpty(port))
-{
-    builder.WebHost.UseUrls($"http://+:{port}");
-}
-
 builder.Services.AddMemoryCache();
 
 // Add HTTP logging (minimal)

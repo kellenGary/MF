@@ -17,3 +17,4 @@ restartPolicyMaxRetries = 3
 [variables]
 ASPNETCORE_ENVIRONMENT = "Production"
 DatabaseProvider = "Postgres"
+ASPNETCORE_URLS = "http://+:8080"
