@@ -96,7 +96,7 @@ export default function ProfilePosts({ userId, isOwnProfile }: ProfilePostsProps
   }
 
   return (
-    <View style={[styles.container, { minHeight: minContentHeight }]}>
+    <View style={styles.container}>
       {/* Filter Chips */}
       <PostFilterChips
         activeFilter={activeFilter}
@@ -105,7 +105,7 @@ export default function ProfilePosts({ userId, isOwnProfile }: ProfilePostsProps
 
       {/* Posts Feed */}
       {posts.length === 0 ? (
-        <View style={styles.emptyContainer}>
+        <View style={[styles.emptyContainer, { minHeight: minContentHeight }]}>
           <MaterialIcons
             name="dynamic-feed"
             size={48}
