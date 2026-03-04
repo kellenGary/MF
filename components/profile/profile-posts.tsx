@@ -140,16 +140,6 @@ export default function ProfilePosts({ userId, isOwnProfile }: ProfilePostsProps
                 .springify()}
               style={[
                 styles.postCard,
-                {
-                  backgroundColor:
-                    colors.background === "#18181B"
-                      ? "rgba(255,255,255,0.04)"
-                      : "rgba(0,0,0,0.03)",
-                  borderColor:
-                    colors.background === "#18181B"
-                      ? "rgba(255,255,255,0.08)"
-                      : "rgba(0,0,0,0.06)",
-                },
               ]}
             >
               <FeedItemRouter item={post} onDelete={handleDeletePost} />
@@ -192,7 +182,6 @@ const styles = StyleSheet.create({
   },
   postCard: {
     borderRadius: 16,
-    borderWidth: 0.5,
     padding: 12,
     marginBottom: 12,
     overflow: "hidden",
