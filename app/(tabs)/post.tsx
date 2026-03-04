@@ -116,6 +116,17 @@ export default function PostScreen() {
     });
   };
 
+  // Deduplicate items by a key selector, keeping the first (most recent) occurrence
+  const dedupe = <T,>(items: T[], getKey: (item: T) => string | number): T[] => {
+    const seen = new Set<string | number>();
+    return items.filter((item) => {
+      const key = getKey(item);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
   const EmptyState = ({ message, icon }: { message: string, icon: keyof typeof MaterialIcons.glyphMap }) => (
     <View style={styles.emptyContainer}>
       <MaterialIcons name={icon} size={64} color={colors.text} style={styles.emptyIcon} />
@@ -139,10 +150,9 @@ export default function PostScreen() {
 
     switch (activeFilter) {
       case "Recent":
-        const filteredSongs = searchItems(
-          recentTracks,
-          ["name", "artistNames"],
-          searchQuery
+        const filteredSongs = dedupe(
+          searchItems(recentTracks, ["name", "artistNames"], searchQuery),
+          (t: any) => t.id
         );
         return filteredSongs.length > 0 ? (
           filteredSongs.map((track: any, index: number) => {
@@ -173,10 +183,9 @@ export default function PostScreen() {
           <EmptyState message="No recent songs found" icon="history" />
         );
       case "Liked":
-        const filteredLikedSongs = searchItems(
-          likedTracks,
-          ["name", "artistNames"],
-          searchQuery
+        const filteredLikedSongs = dedupe(
+          searchItems(likedTracks, ["name", "artistNames"], searchQuery),
+          (t: any) => t.id
         );
         return filteredLikedSongs.length > 0 ? (
           filteredLikedSongs.map((track: any, index: number) => {
@@ -208,10 +217,9 @@ export default function PostScreen() {
         );
 
       case "Albums":
-        const filteredAlbums = searchItems(
-          likedAlbums,
-          ["album.name"],
-          searchQuery
+        const filteredAlbums = dedupe(
+          searchItems(likedAlbums, ["album.name"], searchQuery),
+          (item: any) => item.album.id
         );
         return filteredAlbums.length > 0 ? (
           filteredAlbums.map((item: any, index: number) => {
@@ -246,10 +254,9 @@ export default function PostScreen() {
         );
 
       case "Playlists":
-        const filteredPlaylists = searchItems(
-          userPlaylists,
-          ["name"],
-          searchQuery
+        const filteredPlaylists = dedupe(
+          searchItems(userPlaylists, ["name"], searchQuery),
+          (p: any) => p.id
         );
         return filteredPlaylists.length > 0 ? (
           filteredPlaylists.map((playlist: any, index: number) => {
@@ -281,10 +288,9 @@ export default function PostScreen() {
         );
 
       case "Artists":
-        const filteredArtists = searchItems(
-          followedArtists,
-          ["artist.name"],
-          searchQuery
+        const filteredArtists = dedupe(
+          searchItems(followedArtists, ["artist.name"], searchQuery),
+          (item: any) => item.artist.id
         );
         return filteredArtists.length > 0 ? (
           filteredArtists.map((item: any, index: number) => {

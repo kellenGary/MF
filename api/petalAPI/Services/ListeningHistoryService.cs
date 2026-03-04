@@ -140,7 +140,23 @@ public class ListeningHistoryService : IListeningHistoryService
     {
         try
         {
+            // Deduplicate: reject if an entry for the same user+track already exists within ±3 minutes.
+            // This guards against the client sending the same play twice and against the Spotify
+            // background sync double-recording something the app already wrote.
+            if (await HasRecentDuplicateAsync(userId, trackId, playedAt))
+            {
+                _logger.LogDebug("[ListeningHistory] Duplicate suppressed (AddListeningHistory) for user {UserId}, track {TrackId} at {PlayedAt}",
+                    userId, trackId, playedAt);
+                return;
+            }
+
             var countsAsPlay = msPlayed >= MinPlayTimeMs;
+
+            // Round playedAt to the nearest minute for the dedupe key so it can be matched
+            // cross-source against entries written by AddCurrentlyPlayingAsync.
+            var playedAtRounded = new DateTime(playedAt.Year, playedAt.Month, playedAt.Day,
+                playedAt.Hour, playedAt.Minute, 0, DateTimeKind.Utc);
+            var dedupeKey = $"{userId}_{trackId}_{playedAtRounded:O}";
 
             var listeningHistory = new ListeningHistory
             {
@@ -151,6 +167,7 @@ public class ListeningHistoryService : IListeningHistoryService
                 ContextUri = contextUri,
                 DeviceType = deviceType,
                 Source = ListeningSource.App,
+                DedupeKey = dedupeKey,
                 Latitude = latitude,
                 Longitude = longitude,
                 CountsAsPlay = countsAsPlay
@@ -206,6 +223,16 @@ public class ListeningHistoryService : IListeningHistoryService
             // Check if track exists in DB
             var existingTrack = await _context.Tracks
                 .FirstOrDefaultAsync(t => t.SpotifyId == spotifyTrackId);
+
+            // Cross-source time-window dedup: even if the dedupe key differs (e.g. this entry was
+            // written earlier by AddListeningHistoryAsync), reject if an entry for the same
+            // user+track already exists within ±3 minutes.
+            if (existingTrack != null && await HasRecentDuplicateAsync(userId, existingTrack.Id, playedAt))
+            {
+                _logger.LogDebug("[ListeningHistory] Cross-source duplicate suppressed (AddCurrentlyPlaying) for user {UserId}, track {SpotifyId} at {PlayedAt}",
+                    userId, spotifyTrackId, playedAt);
+                return new AddCurrentlyPlayingResult(true, "Already recorded");
+            }
 
             Track? dbTrack;
             if (existingTrack != null)
@@ -352,6 +379,22 @@ public class ListeningHistoryService : IListeningHistoryService
             _logger.LogError(ex, "[ListeningHistory] Error adding currently playing for user {UserId}", userId);
             return new AddCurrentlyPlayingResult(false, Error: ex.Message);
         }
+    }
+
+    /// <summary>
+    /// Returns true if an entry already exists for this user+track within <paramref name="windowMinutes"/> of
+    /// <paramref name="playedAt"/>, regardless of which source recorded it.
+    /// Used as a cross-source duplicate guard across all three write paths.
+    /// </summary>
+    private async Task<bool> HasRecentDuplicateAsync(int userId, int trackId, DateTime playedAt, int windowMinutes = 3)
+    {
+        var windowStart = playedAt.AddMinutes(-windowMinutes);
+        var windowEnd   = playedAt.AddMinutes(windowMinutes);
+        return await _context.ListeningHistory
+            .AnyAsync(h => h.UserId   == userId
+                        && h.TrackId  == trackId
+                        && h.PlayedAt >= windowStart
+                        && h.PlayedAt <= windowEnd);
     }
 
     private async Task<(int tracksAdded, DateTime? latestPlayedAt)> FetchAndSaveRecentlyPlayedAsync(
@@ -503,6 +546,26 @@ public class ListeningHistoryService : IListeningHistoryService
             {
                 _logger.LogDebug("[ListeningHistory] Duplicate entry found for track {SpotifyId}, skipping", spotifyId);
                 return false; // Already have this entry
+            }
+
+            // Cross-source time-window dedup: check if the app already recorded this play
+            // (the exact dedupeKey above won't match an app-written entry).
+            // Parse playedAt now so we can use it for the window check.
+            var parsedPlayedAt = !string.IsNullOrEmpty(playedAtString)
+                && DateTime.TryParse(playedAtString, null, System.Globalization.DateTimeStyles.RoundtripKind, out var pat)
+                    ? (DateTime?)pat
+                    : null;
+
+            if (parsedPlayedAt.HasValue)
+            {
+                // Resolve the track (look-up only — do not create yet) to get its DB ID for the window check
+                var trackForDedup = await _context.Tracks.FirstOrDefaultAsync(t => t.SpotifyId == spotifyId);
+                if (trackForDedup != null && await HasRecentDuplicateAsync(userId, trackForDedup.Id, parsedPlayedAt.Value))
+                {
+                    _logger.LogDebug("[ListeningHistory] Cross-source duplicate suppressed (SpotifySync) for user {UserId}, track {SpotifyId} at {PlayedAt}",
+                        userId, spotifyId, parsedPlayedAt.Value);
+                    return false;
+                }
             }
 
             // Check if track already exists in database

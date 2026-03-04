@@ -1,0 +1,18 @@
+[build]
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+# Non-secret environment variables — safe to commit.
+# Set secrets in the Railway dashboard under Variables (never commit them):
+#   ConnectionStrings__DefaultConnection
+#   Jwt__SecretKey
+#   Spotify__ClientId
+#   Spotify__ClientSecret
+[variables]
+ASPNETCORE_ENVIRONMENT = "Production"
+DatabaseProvider = "Postgres"

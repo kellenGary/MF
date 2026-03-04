@@ -7,6 +7,7 @@ import profileApi, { CompatibilityResult, ProfileData } from "@/services/profile
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   NativeScrollEvent,
   NativeSyntheticEvent,
   RefreshControl,
@@ -19,6 +20,7 @@ import CompatibilityScore from "./compatibility-score";
 import ProfileContent from "./profile-content";
 import ProfileHeader from "./profile-header";
 import ProfileStats from "./profile-stats";
+import { ThemedText } from "@/components/ui/themed-text";
 
 const PAGE_SIZE = 50;
 
@@ -48,7 +50,7 @@ interface UserProfileProps {
  */
 export default function UserProfile({ userId }: UserProfileProps) {
   const insets = useSafeAreaInsets();
-  const { isAuthenticated, profileData: cachedProfileData } = useAuth();
+  const { isAuthenticated, profileData: cachedProfileData, user, refreshCurrentUser } = useAuth();
   const { collapse } = useScrollContext();
   const { colors } = useTheme();
 
@@ -212,6 +214,11 @@ export default function UserProfile({ userId }: UserProfileProps) {
     try {
       if (userId && !isAuthenticated) return;
 
+      // Re-check sync status if looking at own profile
+      if (isOwnProfile) {
+        await refreshCurrentUser();
+      }
+
       const fetchProfileData = async () => {
         if (!isAuthenticated) return;
         try {
@@ -242,6 +249,8 @@ export default function UserProfile({ userId }: UserProfileProps) {
   }, [
     userId,
     isAuthenticated,
+    isOwnProfile,
+    refreshCurrentUser,
     fetchRecentTracks,
     fetchLikedTracks,
     fetchLikedAlbums,
@@ -259,6 +268,17 @@ export default function UserProfile({ userId }: UserProfileProps) {
         { backgroundColor: colors.background },
       ]}
     >
+      {isOwnProfile && user && !user.isInitialSyncComplete ? (
+        <View style={styles.syncingContainer}>
+          <ActivityIndicator size="large" color={colors.mutedForeground} />
+          <ThemedText type="defaultSemiBold" style={styles.syncingTitle}>
+            Syncing your Spotify data
+          </ThemedText>
+          <ThemedText type="small" style={[styles.syncingSubtitle, { color: colors.mutedForeground }]}>
+            We're importing your music library. Come back soon — your profile will be ready shortly.
+          </ThemedText>
+        </View>
+      ) : (
       <ScrollView
         ref={scrollViewRef}
         style={styles.scrollView}
@@ -328,6 +348,7 @@ export default function UserProfile({ userId }: UserProfileProps) {
           }}
         />
       </ScrollView>
+      )}
     </View>
   );
 }
@@ -343,5 +364,21 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     alignItems: "center",
     gap: 8,
+  },
+  syncingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 40,
+    gap: 16,
+  },
+  syncingTitle: {
+    fontSize: 18,
+    textAlign: "center",
+    marginTop: 8,
+  },
+  syncingSubtitle: {
+    textAlign: "center",
+    lineHeight: 22,
   },
 });

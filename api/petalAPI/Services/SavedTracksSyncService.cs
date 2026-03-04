@@ -9,6 +9,10 @@ namespace PetalAPI.Services;
 public interface ISavedTracksSyncService
 {
     Task<SavedTracksSyncResult> SyncSavedTracksAsync(int userId, string accessToken);
+    /// <summary>
+    /// Ensures a track (plus its album and artists) exists in the database, fetching from Spotify if needed.
+    /// </summary>
+    Task<Track?> GetOrCreateTrackBySpotifyIdAsync(string spotifyId, string accessToken);
 }
 
 public class SavedTracksSyncResult
@@ -199,6 +203,35 @@ public class SavedTracksSyncService : ISavedTracksSyncService
         }
 
         return allTracks;
+    }
+
+    public async Task<Track?> GetOrCreateTrackBySpotifyIdAsync(string spotifyId, string accessToken)
+    {
+        if (string.IsNullOrEmpty(spotifyId))
+            return null;
+
+        // Return early if already in the database
+        var existing = await _context.Tracks
+            .FirstOrDefaultAsync(t => t.SpotifyId == spotifyId);
+        if (existing != null)
+            return existing;
+
+        // Fetch the full track object from Spotify so we can also persist its album and artists
+        var client = _httpClientFactory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await client.GetAsync($"https://api.spotify.com/v1/tracks/{spotifyId}");
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogWarning("[SavedTracksSync] Could not fetch track {SpotifyId} from Spotify: {Status}",
+                spotifyId, response.StatusCode);
+            return null;
+        }
+
+        var content = await response.Content.ReadAsStringAsync();
+        var trackElement = JsonSerializer.Deserialize<JsonElement>(content);
+
+        return await GetOrCreateTrackAsync(trackElement, accessToken);
     }
 
     private async Task<Track?> GetOrCreateTrackAsync(JsonElement trackElement, string accessToken)

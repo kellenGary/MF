@@ -21,6 +21,7 @@ interface User {
   profileImageUrl: string | null;
   hasCompletedProfile: boolean;
   isSessionJoinable: boolean;
+  isInitialSyncComplete: boolean;
 }
 
 interface AuthContextType {
@@ -33,6 +34,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   updateUser: (userData: User) => Promise<void>;
   fetchUserProfile: () => Promise<void>;
+  refreshCurrentUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -212,6 +214,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function refreshCurrentUser() {
+    try {
+      const freshUser = await api.validateStoredToken();
+      if (freshUser) {
+        await SecureStore.setItemAsync("user", JSON.stringify(freshUser));
+        setUser(freshUser);
+      }
+    } catch (error) {
+      console.error("[AuthContext] Failed to refresh current user:", error);
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -224,6 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signOut,
         updateUser,
         fetchUserProfile,
+        refreshCurrentUser,
       }}
     >
       {children}

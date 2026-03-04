@@ -19,6 +19,7 @@ export interface User {
   profileImageUrl: string | null;
   hasCompletedProfile: boolean;
   isSessionJoinable: boolean;
+  isInitialSyncComplete: boolean;
 }
 
 export interface AuthResponse {

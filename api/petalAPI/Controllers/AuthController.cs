@@ -81,7 +81,8 @@ public class AuthController : ControllerBase
                     bio = user.Bio,
                     email = user.Email,
                     profileImageUrl = user.ProfileImageUrl,
-                    hasCompletedProfile = user.HasCompletedProfile
+                    hasCompletedProfile = user.HasCompletedProfile,
+                    isInitialSyncComplete = user.IsInitialSyncComplete
                 }
             });
         }
@@ -132,7 +133,8 @@ public class AuthController : ControllerBase
             bio = user.Bio,
             email = user.Email,
             profileImageUrl = user.ProfileImageUrl,
-            hasCompletedProfile = user.HasCompletedProfile
+            hasCompletedProfile = user.HasCompletedProfile,
+            isInitialSyncComplete = user.IsInitialSyncComplete
         });
     }
 }

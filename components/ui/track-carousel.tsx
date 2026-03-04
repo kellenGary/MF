@@ -285,7 +285,7 @@ function StackedCard({
           <Animated.View style={textAnimatedStyle}>
             <ThemedText
               style={[styles.cardTrackName, { color: colors.text }]}
-              numberOfLines={2}
+              numberOfLines={1}
             >
               {track.name || "Unknown Track"}
             </ThemedText>

@@ -15,6 +15,13 @@ var builder = WebApplication.CreateBuilder(args);
 // Add environment variables to configuration
 builder.Configuration.AddEnvironmentVariables();
 
+// Support Railway's injected PORT env var
+var port = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrEmpty(port))
+{
+    builder.WebHost.UseUrls($"http://+:{port}");
+}
+
 builder.Services.AddMemoryCache();
 
 // Add HTTP logging (minimal)
@@ -170,7 +177,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// Railway terminates TLS at the load balancer — only redirect to HTTPS locally
+if (app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 // Custom Middleware: Log request duration and details
 app.Use(async (context, next) =>
@@ -201,5 +212,8 @@ app.UseCors(policy => policy
     .AllowAnyHeader());
 
 app.MapControllers();
+
+// Lightweight health check for Railway
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
 app.Run();
